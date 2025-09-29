@@ -1,2 +1,2 @@
 # DiaryHOMO
-基于llm的AI包包日记训练
+基于llm微调训练的AI包包日记
