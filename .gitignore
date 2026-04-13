@@ -3,10 +3,10 @@
 __pycache__/
 *.pyc
 .env
-checkpoint/
-large_language_model/
-json/
-md/
-other/
-input_prompt/
-output/
+checkpoint/*
+large_language_model/*
+json/*
+md/*
+other/*
+input_prompt/*
+output/*
