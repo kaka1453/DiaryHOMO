@@ -1,0 +1,15 @@
+{
+  "diary_boa_512": {
+    "file_name": "diary_boa_KAfuck.jsonl",
+    "columns": {
+      "prompt": "text"
+    }
+  },
+  "diary_boa_256": {
+    "file_name": "256diary_resize.jsonl",
+    "columns": {
+      "prompt": "text"
+    }
+  }
+}
+
