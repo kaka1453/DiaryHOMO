@@ -1,0 +1,16 @@
+model_name_or_path: data/large_language_model/Qwen/Qwen2.5-14B-Instruct
+checkpoint_dir: checkpoint/old_ckpt/qwen14b_boa_256/step_12000
+device: cuda
+output_dir: webui/diary_outputs
+save_md: true
+server_name: 0.0.0.0
+server_port: 7860
+share: false
+
+generation:
+  max_new_tokens: 648
+  temperature: 0.9
+  top_p: 0.9
+  top_k: 60
+  repetition_penalty: 6.0
+  num_beams: 3
