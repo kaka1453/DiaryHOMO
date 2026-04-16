@@ -1,1 +1,12 @@
-模型训练内部参数
+lora_r: 32
+lora_alpha: 128
+lora_target_modules:
+  - q_proj
+  - v_proj
+  - k_proj
+  - o_proj
+  - gate_proj
+  - up_proj
+  - down_proj
+lora_dropout: 0.2
+lora_bias: none

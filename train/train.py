@@ -1,59 +1,391 @@
-import os
-import time
+import argparse
+import json
 import math
-import torch
-from torch.utils.data import DataLoader, Sampler
-from datasets import load_dataset
-from transformers import AutoTokenizer, AutoModelForCausalLM, get_scheduler
-from peft import LoraConfig, get_peft_model
-from accelerate import Accelerator
-from tqdm import tqdm
+import os
+import random
+import time
+from pathlib import Path
+
 import matplotlib.pyplot as plt
-from peft import prepare_model_for_kbit_training
+import torch
+import yaml
+from accelerate import Accelerator
+from datasets import load_dataset
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from torch.utils.data import DataLoader, Sampler
+from tqdm import tqdm
+from transformers import AutoModelForCausalLM, AutoTokenizer, get_scheduler
 
-# ==================== 配置区 ====================
-CONFIG = {
-    "BASE_MODEL": "../../Cuming-models/Qwen/Qwen2.5-7B-Instruct",
-    "CHECKPOINT_DIR": "../../HOMOboa-model/checkpoints/ka512-7b",
-    "MAX_LENGTH": 512,
-    "LOAD_IN_8BIT": True,
 
-    "DATA_FILE_PATH": "../../json/ka_512.jsonl",
-    "BATCH_SIZE": 3,
-    "SHUFFLE": True,  # 总体上是否打乱 batch 排序
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_TRAIN_CONFIG_PATH = PROJECT_ROOT / "config" / "train.yaml"
+DEFAULT_MODEL_CONFIG_PATH = PROJECT_ROOT / "config" / "model.yaml"
 
-    # 自动 padding 开关
-    "AUTO_PAD_BATCH": True,  # 测试显存关闭即可
 
-    "LORA_R": 32,
-    "LORA_ALPHA": 128,
-    "LORA_TARGET_MODULES": ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
-    "LORA_DROPOUT": 0.2,
-    "LORA_BIAS": "none",
+def str2bool(value):
+    if isinstance(value, bool):
+        return value
+    normalized = str(value).strip().lower()
+    if normalized in {"1", "true", "t", "yes", "y", "on"}:
+        return True
+    if normalized in {"0", "false", "f", "no", "n", "off"}:
+        return False
+    raise argparse.ArgumentTypeError(f"无法解析布尔值: {value}")
 
-    "EPOCHS": 2000,
-    "GRADIENT_ACCUMULATION_STEPS": 4,
-    "LR": 1e-5,
-    "WARMUP_STEPS": 50
-}
-# ================================================
 
-accelerator = Accelerator(
-    mixed_precision="fp16",   # 自动 fp16，加速、减少显存
-    gradient_accumulation_steps=CONFIG["GRADIENT_ACCUMULATION_STEPS"]
-)
+def parse_target_modules(value):
+    if value is None:
+        return None
+    if isinstance(value, list):
+        modules = [str(item).strip() for item in value if str(item).strip()]
+    else:
+        modules = [item.strip() for item in str(value).split(",") if item.strip()]
+    if not modules:
+        raise ValueError("lora_target_modules 不能为空。")
+    return modules
 
-# ==================== 数据加载 ====================
-dataset = load_dataset("json", data_files={"train": CONFIG["DATA_FILE_PATH"]})["train"]
-tokenizer = AutoTokenizer.from_pretrained(CONFIG["BASE_MODEL"], use_fast=False)
-if tokenizer.pad_token is None:
-    tokenizer.pad_token = tokenizer.eos_token
 
-def tokenize(batch):
-    return tokenizer(batch["text"], truncation=True, max_length=CONFIG["MAX_LENGTH"], return_attention_mask=True)
-dataset = dataset.map(tokenize, batched=True, remove_columns=["text"])
+def build_parser():
+    parser = argparse.ArgumentParser(description="Qwen LoRA training entrypoint")
+    parser.add_argument(
+        "--config",
+        type=str,
+        default=str(DEFAULT_TRAIN_CONFIG_PATH),
+        help="Training YAML config file path.",
+    )
+    parser.add_argument(
+        "--model-config",
+        dest="model_config",
+        type=str,
+        default=str(DEFAULT_MODEL_CONFIG_PATH),
+        help="Model YAML config file path.",
+    )
+    parser.add_argument(
+        "--model-name-or-path",
+        dest="model_name_or_path",
+        type=str,
+        default=None,
+        help="Override model path from config.",
+    )
+    parser.add_argument(
+        "--checkpoint-dir",
+        dest="checkpoint_dir",
+        type=str,
+        default=None,
+        help="Override checkpoint output directory from config.",
+    )
+    parser.add_argument(
+        "--data-file-path",
+        dest="data_file_path",
+        type=str,
+        default=None,
+        help="Override training dataset path from config.",
+    )
+    parser.add_argument(
+        "--max-length",
+        dest="max_length",
+        type=int,
+        default=None,
+        help="Override max sequence length from config.",
+    )
+    parser.add_argument(
+        "--load-in-8bit",
+        dest="load_in_8bit",
+        type=str2bool,
+        default=None,
+        help="Override 8bit loading switch from config.",
+    )
+    parser.add_argument(
+        "--batch-size",
+        dest="batch_size",
+        type=int,
+        default=None,
+        help="Override batch size from config.",
+    )
+    parser.add_argument(
+        "--shuffle",
+        dest="shuffle",
+        type=str2bool,
+        default=None,
+        help="Override whether sorted batches are shuffled between epochs.",
+    )
+    parser.add_argument(
+        "--auto-pad-batch",
+        dest="auto_pad_batch",
+        type=str2bool,
+        default=None,
+        help="Override adaptive padding switch from config.",
+    )
+    parser.add_argument(
+        "--epochs",
+        dest="epochs",
+        type=int,
+        default=None,
+        help="Override max epoch count from config.",
+    )
+    parser.add_argument(
+        "--gradient-accumulation-steps",
+        dest="gradient_accumulation_steps",
+        type=int,
+        default=None,
+        help="Override gradient accumulation steps from config.",
+    )
+    parser.add_argument(
+        "--lr",
+        dest="lr",
+        type=float,
+        default=None,
+        help="Override learning rate from config.",
+    )
+    parser.add_argument(
+        "--warmup-steps",
+        dest="warmup_steps",
+        type=int,
+        default=None,
+        help="Override warmup steps from config.",
+    )
+    parser.add_argument(
+        "--max-steps",
+        dest="max_steps",
+        type=int,
+        default=None,
+        help="Override total optimizer steps from config.",
+    )
+    parser.add_argument(
+        "--save-steps",
+        dest="save_steps",
+        type=int,
+        default=None,
+        help="Override checkpoint save interval from config.",
+    )
+    parser.add_argument(
+        "--seed",
+        dest="seed",
+        type=int,
+        default=None,
+        help="Override random seed from config.",
+    )
+    parser.add_argument(
+        "--num-workers",
+        dest="num_workers",
+        type=int,
+        default=None,
+        help="Override dataloader worker count from config.",
+    )
+    parser.add_argument(
+        "--pin-memory",
+        dest="pin_memory",
+        type=str2bool,
+        default=None,
+        help="Override dataloader pin_memory switch from config.",
+    )
+    parser.add_argument(
+        "--lora-r",
+        dest="lora_r",
+        type=int,
+        default=None,
+        help="Override LoRA rank from model config.",
+    )
+    parser.add_argument(
+        "--lora-alpha",
+        dest="lora_alpha",
+        type=int,
+        default=None,
+        help="Override LoRA alpha from model config.",
+    )
+    parser.add_argument(
+        "--lora-target-modules",
+        dest="lora_target_modules",
+        type=str,
+        default=None,
+        help="Override LoRA target modules from model config, comma-separated.",
+    )
+    parser.add_argument(
+        "--lora-dropout",
+        dest="lora_dropout",
+        type=float,
+        default=None,
+        help="Override LoRA dropout from model config.",
+    )
+    parser.add_argument(
+        "--lora-bias",
+        dest="lora_bias",
+        type=str,
+        default=None,
+        help="Override LoRA bias from model config.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        dest="dry_run",
+        action="store_true",
+        help="Only validate config and print resolved values.",
+    )
+    parser.add_argument(
+        "--simulate-only",
+        dest="simulate_only",
+        action="store_true",
+        help="Run a CPU-side simulation without loading the model into VRAM.",
+    )
+    return parser
 
-# ==================== DataCollator ====================
+
+def load_yaml_config(config_path: Path, label: str):
+    with config_path.open("r", encoding="utf-8") as fh:
+        data = yaml.safe_load(fh) or {}
+    if not isinstance(data, dict):
+        raise ValueError(f"{label} 顶层必须是映射对象。")
+    return data
+
+
+def resolve_path(value: str):
+    path = Path(value)
+    if path.is_absolute():
+        return path
+    return PROJECT_ROOT / path
+
+
+def build_runtime_config(args):
+    train_config_path = Path(args.config).expanduser().resolve()
+    model_config_path = Path(args.model_config).expanduser().resolve()
+    train_cfg = load_yaml_config(train_config_path, "config/train.yaml")
+    model_cfg = load_yaml_config(model_config_path, "config/model.yaml")
+
+    runtime = {
+        "model_name_or_path": train_cfg.get("model_name_or_path"),
+        "checkpoint_dir": train_cfg.get("checkpoint_dir"),
+        "data_file_path": train_cfg.get("data_file_path"),
+        "max_length": train_cfg.get("max_length"),
+        "load_in_8bit": train_cfg.get("load_in_8bit"),
+        "batch_size": train_cfg.get("batch_size"),
+        "shuffle": train_cfg.get("shuffle"),
+        "auto_pad_batch": train_cfg.get("auto_pad_batch"),
+        "epochs": train_cfg.get("epochs"),
+        "gradient_accumulation_steps": train_cfg.get("gradient_accumulation_steps"),
+        "lr": train_cfg.get("lr"),
+        "warmup_steps": train_cfg.get("warmup_steps"),
+        "max_steps": train_cfg.get("max_steps"),
+        "save_steps": train_cfg.get("save_steps"),
+        "seed": train_cfg.get("seed"),
+        "num_workers": train_cfg.get("num_workers"),
+        "pin_memory": train_cfg.get("pin_memory"),
+        "lora_r": model_cfg.get("lora_r"),
+        "lora_alpha": model_cfg.get("lora_alpha"),
+        "lora_target_modules": model_cfg.get("lora_target_modules"),
+        "lora_dropout": model_cfg.get("lora_dropout"),
+        "lora_bias": model_cfg.get("lora_bias"),
+    }
+
+    cli_overrides = {
+        key: value
+        for key, value in vars(args).items()
+        if key not in {"config", "model_config", "dry_run", "simulate_only"} and value is not None
+    }
+    runtime.update(cli_overrides)
+
+    required_keys = [
+        "model_name_or_path",
+        "checkpoint_dir",
+        "data_file_path",
+        "max_length",
+        "load_in_8bit",
+        "batch_size",
+        "shuffle",
+        "auto_pad_batch",
+        "epochs",
+        "gradient_accumulation_steps",
+        "lr",
+        "warmup_steps",
+        "max_steps",
+        "save_steps",
+        "seed",
+        "num_workers",
+        "pin_memory",
+        "lora_r",
+        "lora_alpha",
+        "lora_target_modules",
+        "lora_dropout",
+        "lora_bias",
+    ]
+    missing = [key for key in required_keys if runtime.get(key) is None]
+    if missing:
+        raise ValueError(f"train/model 配置缺少字段: {', '.join(missing)}")
+
+    runtime["train_config_path"] = train_config_path
+    runtime["model_config_path"] = model_config_path
+    runtime["model_name_or_path"] = str(resolve_path(runtime["model_name_or_path"]))
+    runtime["checkpoint_dir"] = str(resolve_path(runtime["checkpoint_dir"]))
+    runtime["data_file_path"] = str(resolve_path(runtime["data_file_path"]))
+    runtime["max_length"] = int(runtime["max_length"])
+    runtime["load_in_8bit"] = bool(runtime["load_in_8bit"])
+    runtime["batch_size"] = int(runtime["batch_size"])
+    runtime["shuffle"] = bool(runtime["shuffle"])
+    runtime["auto_pad_batch"] = bool(runtime["auto_pad_batch"])
+    runtime["epochs"] = int(runtime["epochs"])
+    runtime["gradient_accumulation_steps"] = int(runtime["gradient_accumulation_steps"])
+    runtime["lr"] = float(runtime["lr"])
+    runtime["warmup_steps"] = int(runtime["warmup_steps"])
+    runtime["max_steps"] = int(runtime["max_steps"])
+    runtime["save_steps"] = int(runtime["save_steps"])
+    runtime["seed"] = int(runtime["seed"])
+    runtime["num_workers"] = int(runtime["num_workers"])
+    runtime["pin_memory"] = bool(runtime["pin_memory"])
+    runtime["lora_r"] = int(runtime["lora_r"])
+    runtime["lora_alpha"] = int(runtime["lora_alpha"])
+    runtime["lora_target_modules"] = parse_target_modules(runtime["lora_target_modules"])
+    runtime["lora_dropout"] = float(runtime["lora_dropout"])
+    runtime["lora_bias"] = str(runtime["lora_bias"])
+
+    if runtime["max_length"] <= 0:
+        raise ValueError("max_length 必须大于 0。")
+    if runtime["batch_size"] <= 0:
+        raise ValueError("batch_size 必须大于 0。")
+    if runtime["gradient_accumulation_steps"] <= 0:
+        raise ValueError("gradient_accumulation_steps 必须大于 0。")
+    if runtime["epochs"] <= 0:
+        raise ValueError("epochs 必须大于 0。")
+    if runtime["max_steps"] <= 0:
+        raise ValueError("max_steps 必须大于 0。")
+    if runtime["save_steps"] <= 0:
+        raise ValueError("save_steps 必须大于 0。")
+    if runtime["warmup_steps"] < 0:
+        raise ValueError("warmup_steps 不能小于 0。")
+    if runtime["num_workers"] < 0:
+        raise ValueError("num_workers 不能小于 0。")
+    if runtime["lora_r"] <= 0 or runtime["lora_alpha"] <= 0:
+        raise ValueError("LoRA rank 和 alpha 必须大于 0。")
+    return runtime
+
+
+def dump_runtime_config(runtime):
+    printable = dict(runtime)
+    printable["train_config_path"] = str(printable["train_config_path"])
+    printable["model_config_path"] = str(printable["model_config_path"])
+    return json.dumps(printable, ensure_ascii=False, indent=2)
+
+
+def set_reproducibility(seed):
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    if hasattr(torch.backends, "cudnn"):
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+
+def validate_paths(runtime):
+    model_path = Path(runtime["model_name_or_path"])
+    data_path = Path(runtime["data_file_path"])
+    checkpoint_dir = Path(runtime["checkpoint_dir"])
+
+    if not model_path.exists():
+        raise FileNotFoundError(f"模型路径不存在: {model_path}")
+    if not data_path.exists():
+        raise FileNotFoundError(f"数据集路径不存在: {data_path}")
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+
 class DataCollatorForCausalLMWith8xPadding:
     def __init__(self, tokenizer, max_length=None, pad_to_max_length=False, label_pad_token_id=-100):
         self.tokenizer = tokenizer
@@ -64,110 +396,147 @@ class DataCollatorForCausalLMWith8xPadding:
     def __call__(self, features):
         batch_max_len = self.max_length if self.pad_to_max_length else max(len(f["input_ids"]) for f in features)
         padded_len = int(math.ceil(batch_max_len / 8) * 8)
-        batch = self.tokenizer.pad(features, padding="max_length", max_length=padded_len, return_tensors="pt")
+        batch = self.tokenizer.pad(
+            features,
+            padding="max_length",
+            max_length=padded_len,
+            return_tensors="pt",
+        )
         labels = batch["input_ids"].clone()
         labels[batch["attention_mask"] == 0] = self.label_pad_token_id
         batch["labels"] = labels
         return batch
 
-pad_to_max = not CONFIG["AUTO_PAD_BATCH"]
-data_collator = DataCollatorForCausalLMWith8xPadding(
-    tokenizer,
-    max_length=CONFIG["MAX_LENGTH"],
-    pad_to_max_length=pad_to_max,
-    label_pad_token_id=-100
-)
 
-# ==================== BatchSampler ====================
 class SortedBatchSampler(Sampler):
-    def __init__(self, dataset, batch_size, shuffle=True):
+    def __init__(self, dataset, batch_size, shuffle=True, seed=42):
         self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle = shuffle
+        self.seed = seed
+        self.iteration = 0
         self.lengths = [len(item["input_ids"]) for item in dataset]
 
     def __iter__(self):
         indices = list(range(len(self.dataset)))
-        indices.sort(key=lambda i: self.lengths[i], reverse=True)
+        indices.sort(key=lambda idx: self.lengths[idx], reverse=True)
         if self.shuffle:
-            batch_indices = [indices[i:i+self.batch_size] for i in range(0, len(indices), self.batch_size)]
-            import random
-            random.shuffle(batch_indices)
-            indices = [i for batch in batch_indices for i in batch]
+            batch_indices = [
+                indices[i : i + self.batch_size]
+                for i in range(0, len(indices), self.batch_size)
+            ]
+            rng = random.Random(self.seed + self.iteration)
+            rng.shuffle(batch_indices)
+            indices = [idx for batch in batch_indices for idx in batch]
+        self.iteration += 1
         return iter(indices)
 
     def __len__(self):
         return len(self.dataset)
 
-sampler = SortedBatchSampler(dataset, batch_size=CONFIG["BATCH_SIZE"], shuffle=CONFIG["SHUFFLE"])
-# ==================== DataLoader ====================
-train_loader = DataLoader(
-    dataset,
-    batch_size=CONFIG["BATCH_SIZE"],
-    sampler=sampler,
-    collate_fn=data_collator,
-    num_workers=8,         # CPU 并行处理 batch
-    pin_memory=True        # 直接拷贝到 GPU，加速
-)
 
-# ==================== 模型加载优化 ====================
-model = AutoModelForCausalLM.from_pretrained(
-    CONFIG["BASE_MODEL"],
-    load_in_8bit=CONFIG["LOAD_IN_8BIT"],
-    device_map="auto"
-)
-
-model = prepare_model_for_kbit_training(model)  # ⭐关键
-
-model.gradient_checkpointing_enable()
-
-peft_cfg = LoraConfig(
-    r=CONFIG["LORA_R"],
-    lora_alpha=CONFIG["LORA_ALPHA"],
-    target_modules=CONFIG["LORA_TARGET_MODULES"],
-    lora_dropout=CONFIG["LORA_DROPOUT"],
-    bias=CONFIG["LORA_BIAS"],
-    task_type="CAUSAL_LM"
-)
-model = get_peft_model(model, peft_cfg)
+def load_tokenizer(runtime):
+    tokenizer = AutoTokenizer.from_pretrained(
+        runtime["model_name_or_path"],
+        use_fast=False,
+        trust_remote_code=True,
+    )
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    return tokenizer
 
 
-optimizer = torch.optim.AdamW(model.parameters(), lr=CONFIG["LR"])
-num_update_steps_per_epoch = max(1, len(train_loader) // CONFIG["GRADIENT_ACCUMULATION_STEPS"])
-num_training_steps = num_update_steps_per_epoch * CONFIG["EPOCHS"]
-lr_scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=CONFIG["WARMUP_STEPS"], num_training_steps=num_training_steps)
+def load_training_dataset(runtime, tokenizer):
+    dataset = load_dataset("json", data_files={"train": runtime["data_file_path"]})["train"]
+    if "text" not in dataset.column_names:
+        raise ValueError(f"训练数据缺少 text 字段: {dataset.column_names}")
 
-# Accelerator 准备模型和优化器
-model, optimizer, train_loader, lr_scheduler = accelerator.prepare(
-    model, optimizer, train_loader, lr_scheduler
-)
+    def tokenize(batch):
+        return tokenizer(
+            batch["text"],
+            truncation=True,
+            max_length=runtime["max_length"],
+            return_attention_mask=True,
+        )
 
-# ==================== 训练监控数据 ====================
-metrics = {
-    "loss": [],
-    "perplexity": [],
-    "lr": [],
-    "step_time": [],
-    "throughput": []
-}
+    tokenized_dataset = dataset.map(tokenize, batched=True, remove_columns=dataset.column_names)
+    return tokenized_dataset
 
-# ==================== 绘图函数 ====================
+
+def build_data_loader(runtime, dataset, tokenizer):
+    data_collator = DataCollatorForCausalLMWith8xPadding(
+        tokenizer=tokenizer,
+        max_length=runtime["max_length"],
+        pad_to_max_length=not runtime["auto_pad_batch"],
+        label_pad_token_id=-100,
+    )
+    sampler = SortedBatchSampler(
+        dataset=dataset,
+        batch_size=runtime["batch_size"],
+        shuffle=runtime["shuffle"],
+        seed=runtime["seed"],
+    )
+    train_loader = DataLoader(
+        dataset,
+        batch_size=runtime["batch_size"],
+        sampler=sampler,
+        collate_fn=data_collator,
+        num_workers=runtime["num_workers"],
+        pin_memory=runtime["pin_memory"],
+    )
+    return train_loader
+
+
+def create_lora_config(runtime):
+    return LoraConfig(
+        r=runtime["lora_r"],
+        lora_alpha=runtime["lora_alpha"],
+        target_modules=runtime["lora_target_modules"],
+        lora_dropout=runtime["lora_dropout"],
+        bias=runtime["lora_bias"],
+        task_type="CAUSAL_LM",
+    )
+
+
+def compute_schedule(runtime, train_loader):
+    num_update_steps_per_epoch = max(
+        1,
+        math.ceil(len(train_loader) / runtime["gradient_accumulation_steps"]),
+    )
+    total_possible_steps = num_update_steps_per_epoch * runtime["epochs"]
+    planned_training_steps = min(runtime["max_steps"], total_possible_steps)
+    return {
+        "num_update_steps_per_epoch": num_update_steps_per_epoch,
+        "total_possible_steps": total_possible_steps,
+        "planned_training_steps": planned_training_steps,
+    }
+
+
+def save_runtime_snapshot(runtime):
+    checkpoint_dir = Path(runtime["checkpoint_dir"])
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    snapshot_path = checkpoint_dir / "resolved_train_runtime.json"
+    with snapshot_path.open("w", encoding="utf-8") as fh:
+        fh.write(dump_runtime_config(runtime))
+    return snapshot_path
+
+
 def plot_metrics(metrics, save_path):
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    save_path = Path(save_path)
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+
     fig, axes = plt.subplots(2, 3, figsize=(18, 10))
     axes = axes.flatten()
-
     titles = ["Loss", "Perplexity", "Learning Rate", "Step Time", "Throughput"]
     colors = ["b", "orange", "red", "purple", "brown"]
     keys = ["loss", "perplexity", "lr", "step_time", "throughput"]
 
     for ax, title, key, color in zip(axes, titles, keys, colors):
-        ax.plot(range(1, len(metrics[key])+1), metrics[key], marker="o", color=color)
+        ax.plot(range(1, len(metrics[key]) + 1), metrics[key], marker="o", color=color)
         ax.set_title(title)
         ax.set_xlabel("Epoch")
         ax.set_ylabel(title)
 
-    # 删除多余子图
     if len(axes) > len(keys):
         for ax in axes[len(keys):]:
             fig.delaxes(ax)
@@ -176,66 +545,174 @@ def plot_metrics(metrics, save_path):
     plt.savefig(save_path)
     plt.close(fig)
 
-# ==================== max_steps 训练控制 ====================
-CONFIG["MAX_STEPS"] = 50000        # 按 tokens 控制，总训练步数
-CONFIG["SAVE_STEPS"] = 2000        # 每隔多少 steps 保存一次
 
-global_step = 0
-epoch = 0
-while global_step < CONFIG["MAX_STEPS"]:
-    model.train()
-    epoch_loss = 0.0
-    epoch_lr = []
-    epoch_step_time = []
-    epoch_throughput = []
-    start_time = time.time()
-    progress = tqdm(train_loader, desc=f"Epoch {epoch+1}", leave=False)
+def simulate_pipeline(runtime):
+    validate_paths(runtime)
+    set_reproducibility(runtime["seed"])
+    tokenizer = load_tokenizer(runtime)
+    dataset = load_training_dataset(runtime, tokenizer)
+    train_loader = build_data_loader(runtime, dataset, tokenizer)
+    lora_config = create_lora_config(runtime)
+    schedule = compute_schedule(runtime, train_loader)
+    first_batch = next(iter(train_loader))
 
-    for step, batch in enumerate(progress):
-        if global_step >= CONFIG["MAX_STEPS"]:
-            break
+    summary = {
+        "dataset_size": len(dataset),
+        "batch_input_shape": list(first_batch["input_ids"].shape),
+        "batch_labels_shape": list(first_batch["labels"].shape),
+        "first_batch_max_token_id": int(first_batch["input_ids"].max().item()),
+        "lora_target_modules": sorted(list(lora_config.target_modules)),
+        "num_update_steps_per_epoch": schedule["num_update_steps_per_epoch"],
+        "planned_training_steps": schedule["planned_training_steps"],
+        "checkpoint_dir": runtime["checkpoint_dir"],
+    }
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    print("Train 模拟检查通过。")
 
-        step_start = time.time()
-        outputs = model(**batch)
-        loss = outputs.loss / CONFIG["GRADIENT_ACCUMULATION_STEPS"]
-        accelerator.backward(loss)
 
-        if (step + 1) % CONFIG["GRADIENT_ACCUMULATION_STEPS"] == 0:
+def load_model(runtime, lora_config):
+    model = AutoModelForCausalLM.from_pretrained(
+        runtime["model_name_or_path"],
+        load_in_8bit=runtime["load_in_8bit"],
+        device_map="auto",
+        trust_remote_code=True,
+    )
+    if runtime["load_in_8bit"]:
+        model = prepare_model_for_kbit_training(model)
+    model.gradient_checkpointing_enable()
+    model = get_peft_model(model, lora_config)
+    return model
+
+
+def train(runtime):
+    validate_paths(runtime)
+    set_reproducibility(runtime["seed"])
+    snapshot_path = save_runtime_snapshot(runtime)
+
+    accelerator = Accelerator(
+        mixed_precision="fp16",
+        gradient_accumulation_steps=runtime["gradient_accumulation_steps"],
+    )
+
+    tokenizer = load_tokenizer(runtime)
+    dataset = load_training_dataset(runtime, tokenizer)
+    train_loader = build_data_loader(runtime, dataset, tokenizer)
+    lora_config = create_lora_config(runtime)
+    schedule = compute_schedule(runtime, train_loader)
+
+    model = load_model(runtime, lora_config)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=runtime["lr"])
+    lr_scheduler = get_scheduler(
+        "linear",
+        optimizer=optimizer,
+        num_warmup_steps=runtime["warmup_steps"],
+        num_training_steps=schedule["planned_training_steps"],
+    )
+
+    model, optimizer, train_loader, lr_scheduler = accelerator.prepare(
+        model,
+        optimizer,
+        train_loader,
+        lr_scheduler,
+    )
+
+    metrics = {
+        "loss": [],
+        "perplexity": [],
+        "lr": [],
+        "step_time": [],
+        "throughput": [],
+    }
+
+    accelerator.print(f"已写入实验快照: {snapshot_path}")
+    global_step = 0
+    epoch = 0
+
+    while global_step < runtime["max_steps"] and epoch < runtime["epochs"]:
+        model.train()
+        epoch_loss = 0.0
+        epoch_lr = []
+        epoch_step_time = []
+        epoch_throughput = []
+        optimizer_updates = 0
+        start_time = time.time()
+        progress = tqdm(train_loader, desc=f"Epoch {epoch + 1}", leave=False, disable=not accelerator.is_local_main_process)
+
+        for step, batch in enumerate(progress):
+            if global_step >= runtime["max_steps"]:
+                break
+
+            step_start = time.time()
+            outputs = model(**batch)
+            loss = outputs.loss / runtime["gradient_accumulation_steps"]
+            accelerator.backward(loss)
+
+            is_last_batch = (step + 1) == len(train_loader)
+            should_step = ((step + 1) % runtime["gradient_accumulation_steps"] == 0) or is_last_batch
+            if not should_step:
+                continue
+
             optimizer.step()
             lr_scheduler.step()
             optimizer.zero_grad()
             global_step += 1
-            epoch_loss += loss.item() * CONFIG["GRADIENT_ACCUMULATION_STEPS"]
+            optimizer_updates += 1
+            epoch_loss += loss.item() * runtime["gradient_accumulation_steps"]
 
-            # 记录 lr、step_time、吞吐量
-            epoch_lr.append(lr_scheduler.get_last_lr()[0])
             step_time = time.time() - step_start
+            epoch_lr.append(lr_scheduler.get_last_lr()[0])
             epoch_step_time.append(step_time)
-            epoch_throughput.append(CONFIG["BATCH_SIZE"] / step_time)
+            epoch_throughput.append(runtime["batch_size"] / max(step_time, 1e-6))
 
-            # ==================== 每隔 SAVE_STEPS 保存模型 ====================
-            if global_step % CONFIG["SAVE_STEPS"] == 0:
-                save_dir = os.path.join(CONFIG["CHECKPOINT_DIR"], f"step_{global_step}")
-                os.makedirs(save_dir, exist_ok=True)
+            if global_step % runtime["save_steps"] == 0:
+                save_dir = Path(runtime["checkpoint_dir"]) / f"step_{global_step}"
+                save_dir.mkdir(parents=True, exist_ok=True)
                 unwrapped = accelerator.unwrap_model(model)
                 unwrapped.save_pretrained(save_dir, safe_serialization=True)
                 tokenizer.save_pretrained(save_dir)
-                print(f"💾 模型已保存至 {save_dir}")
+                accelerator.print(f"模型已保存至 {save_dir}")
 
-                metrics_path = os.path.join(CONFIG["CHECKPOINT_DIR"], "metrics_images", f"metrics_up_to_step_{global_step}.png")
+                metrics_path = Path(runtime["checkpoint_dir"]) / "metrics_images" / f"metrics_up_to_step_{global_step}.png"
                 plot_metrics(metrics, metrics_path)
-                print(f"📊 指标图已保存至 {metrics_path}")
+                accelerator.print(f"指标图已保存至 {metrics_path}")
 
-    # 计算 epoch 平均值
-    metrics["loss"].append(epoch_loss / len(train_loader))
-    metrics["perplexity"].append(math.exp(epoch_loss / len(train_loader)))
-    metrics["lr"].append(sum(epoch_lr)/len(epoch_lr))
-    metrics["step_time"].append(sum(epoch_step_time)/len(epoch_step_time))
-    metrics["throughput"].append(sum(epoch_throughput)/len(epoch_throughput))
+        if optimizer_updates == 0:
+            accelerator.print("当前 epoch 未产生优化步，训练提前结束。")
+            break
 
-    epoch += 1
-    epoch_elapsed = time.time() - start_time
-    print(f"Epoch {epoch} | avg_loss: {metrics['loss'][-1]:.4f} | time: {epoch_elapsed:.1f}s | speed: {epoch_elapsed/len(train_loader):.2f}s/step")
+        avg_loss = epoch_loss / optimizer_updates
+        metrics["loss"].append(avg_loss)
+        metrics["perplexity"].append(math.exp(min(avg_loss, 20)))
+        metrics["lr"].append(sum(epoch_lr) / len(epoch_lr))
+        metrics["step_time"].append(sum(epoch_step_time) / len(epoch_step_time))
+        metrics["throughput"].append(sum(epoch_throughput) / len(epoch_throughput))
 
-print("🎉 全部训练完成！")
+        epoch += 1
+        epoch_elapsed = time.time() - start_time
+        accelerator.print(
+            f"Epoch {epoch} | avg_loss: {metrics['loss'][-1]:.4f} | "
+            f"time: {epoch_elapsed:.1f}s | speed: {epoch_elapsed / max(len(train_loader), 1):.2f}s/step"
+        )
 
+    accelerator.print("全部训练完成。")
+
+
+def main():
+    parser = build_parser()
+    args = parser.parse_args()
+    runtime = build_runtime_config(args)
+
+    if args.dry_run:
+        print("Train 配置检查通过。")
+        print(dump_runtime_config(runtime))
+        return
+
+    if args.simulate_only:
+        simulate_pipeline(runtime)
+        return
+
+    train(runtime)
+
+
+if __name__ == "__main__":
+    main()
