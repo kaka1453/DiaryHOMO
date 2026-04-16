@@ -21,6 +21,62 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TRAIN_CONFIG_PATH = PROJECT_ROOT / "config" / "train.yaml"
 DEFAULT_MODEL_CONFIG_PATH = PROJECT_ROOT / "config" / "model.yaml"
 
+TRAIN_CONFIG_FIELDS = [
+    "model_name_or_path",
+    "checkpoint_dir",
+    "data_file_path",
+    "max_length",
+    "load_in_8bit",
+    "batch_size",
+    "shuffle",
+    "auto_pad_batch",
+    "epochs",
+    "gradient_accumulation_steps",
+    "lr",
+    "warmup_steps",
+    "max_steps",
+    "save_steps",
+    "seed",
+    "num_workers",
+    "pin_memory",
+]
+
+MODEL_CONFIG_FIELDS = [
+    "lora_r",
+    "lora_alpha",
+    "lora_target_modules",
+    "lora_dropout",
+    "lora_bias",
+]
+
+PATH_FIELDS = {"model_name_or_path", "checkpoint_dir", "data_file_path"}
+INT_FIELDS = {
+    "max_length",
+    "batch_size",
+    "epochs",
+    "gradient_accumulation_steps",
+    "warmup_steps",
+    "max_steps",
+    "save_steps",
+    "seed",
+    "num_workers",
+    "lora_r",
+    "lora_alpha",
+}
+FLOAT_FIELDS = {"lr", "lora_dropout"}
+BOOL_FIELDS = {"load_in_8bit", "shuffle", "auto_pad_batch", "pin_memory"}
+POSITIVE_FIELDS = {
+    "max_length",
+    "batch_size",
+    "gradient_accumulation_steps",
+    "epochs",
+    "max_steps",
+    "save_steps",
+    "lora_r",
+    "lora_alpha",
+}
+NON_NEGATIVE_FIELDS = {"warmup_steps", "num_workers"}
+
 
 def str2bool(value):
     if isinstance(value, bool):
@@ -31,6 +87,42 @@ def str2bool(value):
     if normalized in {"0", "false", "f", "no", "n", "off"}:
         return False
     raise argparse.ArgumentTypeError(f"无法解析布尔值: {value}")
+
+
+CLI_OVERRIDE_SPECS = [
+    ("--model-name-or-path", "model_name_or_path", str, "Override model path from config."),
+    ("--checkpoint-dir", "checkpoint_dir", str, "Override checkpoint output directory from config."),
+    ("--data-file-path", "data_file_path", str, "Override training dataset path from config."),
+    ("--max-length", "max_length", int, "Override max sequence length from config."),
+    ("--load-in-8bit", "load_in_8bit", str2bool, "Override 8bit loading switch from config."),
+    ("--batch-size", "batch_size", int, "Override batch size from config."),
+    ("--shuffle", "shuffle", str2bool, "Override whether sorted batches are shuffled between epochs."),
+    ("--auto-pad-batch", "auto_pad_batch", str2bool, "Override adaptive padding switch from config."),
+    ("--epochs", "epochs", int, "Override max epoch count from config."),
+    (
+        "--gradient-accumulation-steps",
+        "gradient_accumulation_steps",
+        int,
+        "Override gradient accumulation steps from config.",
+    ),
+    ("--lr", "lr", float, "Override learning rate from config."),
+    ("--warmup-steps", "warmup_steps", int, "Override warmup steps from config."),
+    ("--max-steps", "max_steps", int, "Override total optimizer steps from config."),
+    ("--save-steps", "save_steps", int, "Override checkpoint save interval from config."),
+    ("--seed", "seed", int, "Override random seed from config."),
+    ("--num-workers", "num_workers", int, "Override dataloader worker count from config."),
+    ("--pin-memory", "pin_memory", str2bool, "Override dataloader pin_memory switch from config."),
+    ("--lora-r", "lora_r", int, "Override LoRA rank from model config."),
+    ("--lora-alpha", "lora_alpha", int, "Override LoRA alpha from model config."),
+    (
+        "--lora-target-modules",
+        "lora_target_modules",
+        str,
+        "Override LoRA target modules from model config, comma-separated.",
+    ),
+    ("--lora-dropout", "lora_dropout", float, "Override LoRA dropout from model config."),
+    ("--lora-bias", "lora_bias", str, "Override LoRA bias from model config."),
+]
 
 
 def parse_target_modules(value):
@@ -60,160 +152,14 @@ def build_parser():
         default=str(DEFAULT_MODEL_CONFIG_PATH),
         help="Model YAML config file path.",
     )
-    parser.add_argument(
-        "--model-name-or-path",
-        dest="model_name_or_path",
-        type=str,
-        default=None,
-        help="Override model path from config.",
-    )
-    parser.add_argument(
-        "--checkpoint-dir",
-        dest="checkpoint_dir",
-        type=str,
-        default=None,
-        help="Override checkpoint output directory from config.",
-    )
-    parser.add_argument(
-        "--data-file-path",
-        dest="data_file_path",
-        type=str,
-        default=None,
-        help="Override training dataset path from config.",
-    )
-    parser.add_argument(
-        "--max-length",
-        dest="max_length",
-        type=int,
-        default=None,
-        help="Override max sequence length from config.",
-    )
-    parser.add_argument(
-        "--load-in-8bit",
-        dest="load_in_8bit",
-        type=str2bool,
-        default=None,
-        help="Override 8bit loading switch from config.",
-    )
-    parser.add_argument(
-        "--batch-size",
-        dest="batch_size",
-        type=int,
-        default=None,
-        help="Override batch size from config.",
-    )
-    parser.add_argument(
-        "--shuffle",
-        dest="shuffle",
-        type=str2bool,
-        default=None,
-        help="Override whether sorted batches are shuffled between epochs.",
-    )
-    parser.add_argument(
-        "--auto-pad-batch",
-        dest="auto_pad_batch",
-        type=str2bool,
-        default=None,
-        help="Override adaptive padding switch from config.",
-    )
-    parser.add_argument(
-        "--epochs",
-        dest="epochs",
-        type=int,
-        default=None,
-        help="Override max epoch count from config.",
-    )
-    parser.add_argument(
-        "--gradient-accumulation-steps",
-        dest="gradient_accumulation_steps",
-        type=int,
-        default=None,
-        help="Override gradient accumulation steps from config.",
-    )
-    parser.add_argument(
-        "--lr",
-        dest="lr",
-        type=float,
-        default=None,
-        help="Override learning rate from config.",
-    )
-    parser.add_argument(
-        "--warmup-steps",
-        dest="warmup_steps",
-        type=int,
-        default=None,
-        help="Override warmup steps from config.",
-    )
-    parser.add_argument(
-        "--max-steps",
-        dest="max_steps",
-        type=int,
-        default=None,
-        help="Override total optimizer steps from config.",
-    )
-    parser.add_argument(
-        "--save-steps",
-        dest="save_steps",
-        type=int,
-        default=None,
-        help="Override checkpoint save interval from config.",
-    )
-    parser.add_argument(
-        "--seed",
-        dest="seed",
-        type=int,
-        default=None,
-        help="Override random seed from config.",
-    )
-    parser.add_argument(
-        "--num-workers",
-        dest="num_workers",
-        type=int,
-        default=None,
-        help="Override dataloader worker count from config.",
-    )
-    parser.add_argument(
-        "--pin-memory",
-        dest="pin_memory",
-        type=str2bool,
-        default=None,
-        help="Override dataloader pin_memory switch from config.",
-    )
-    parser.add_argument(
-        "--lora-r",
-        dest="lora_r",
-        type=int,
-        default=None,
-        help="Override LoRA rank from model config.",
-    )
-    parser.add_argument(
-        "--lora-alpha",
-        dest="lora_alpha",
-        type=int,
-        default=None,
-        help="Override LoRA alpha from model config.",
-    )
-    parser.add_argument(
-        "--lora-target-modules",
-        dest="lora_target_modules",
-        type=str,
-        default=None,
-        help="Override LoRA target modules from model config, comma-separated.",
-    )
-    parser.add_argument(
-        "--lora-dropout",
-        dest="lora_dropout",
-        type=float,
-        default=None,
-        help="Override LoRA dropout from model config.",
-    )
-    parser.add_argument(
-        "--lora-bias",
-        dest="lora_bias",
-        type=str,
-        default=None,
-        help="Override LoRA bias from model config.",
-    )
+    for flag, dest, value_type, help_text in CLI_OVERRIDE_SPECS:
+        parser.add_argument(
+            flag,
+            dest=dest,
+            type=value_type,
+            default=None,
+            help=help_text,
+        )
     parser.add_argument(
         "--dry-run",
         dest="dry_run",
@@ -244,36 +190,48 @@ def resolve_path(value: str):
     return PROJECT_ROOT / path
 
 
+def collect_config_values(config_data, fields):
+    return {field: config_data.get(field) for field in fields}
+
+
+def apply_runtime_casts(runtime):
+    for field in PATH_FIELDS:
+        runtime[field] = str(resolve_path(runtime[field]))
+    for field in INT_FIELDS:
+        runtime[field] = int(runtime[field])
+    for field in FLOAT_FIELDS:
+        runtime[field] = float(runtime[field])
+    for field in BOOL_FIELDS:
+        runtime[field] = bool(runtime[field])
+    runtime["lora_target_modules"] = parse_target_modules(runtime["lora_target_modules"])
+    runtime["lora_bias"] = str(runtime["lora_bias"])
+
+
+def validate_runtime_values(runtime):
+    missing = [
+        field
+        for field in TRAIN_CONFIG_FIELDS + MODEL_CONFIG_FIELDS
+        if runtime.get(field) is None
+    ]
+    if missing:
+        raise ValueError(f"train/model 配置缺少字段: {', '.join(missing)}")
+
+    for field in POSITIVE_FIELDS:
+        if runtime[field] <= 0:
+            raise ValueError(f"{field} 必须大于 0。")
+    for field in NON_NEGATIVE_FIELDS:
+        if runtime[field] < 0:
+            raise ValueError(f"{field} 不能小于 0。")
+
+
 def build_runtime_config(args):
     train_config_path = Path(args.config).expanduser().resolve()
     model_config_path = Path(args.model_config).expanduser().resolve()
     train_cfg = load_yaml_config(train_config_path, "config/train.yaml")
     model_cfg = load_yaml_config(model_config_path, "config/model.yaml")
 
-    runtime = {
-        "model_name_or_path": train_cfg.get("model_name_or_path"),
-        "checkpoint_dir": train_cfg.get("checkpoint_dir"),
-        "data_file_path": train_cfg.get("data_file_path"),
-        "max_length": train_cfg.get("max_length"),
-        "load_in_8bit": train_cfg.get("load_in_8bit"),
-        "batch_size": train_cfg.get("batch_size"),
-        "shuffle": train_cfg.get("shuffle"),
-        "auto_pad_batch": train_cfg.get("auto_pad_batch"),
-        "epochs": train_cfg.get("epochs"),
-        "gradient_accumulation_steps": train_cfg.get("gradient_accumulation_steps"),
-        "lr": train_cfg.get("lr"),
-        "warmup_steps": train_cfg.get("warmup_steps"),
-        "max_steps": train_cfg.get("max_steps"),
-        "save_steps": train_cfg.get("save_steps"),
-        "seed": train_cfg.get("seed"),
-        "num_workers": train_cfg.get("num_workers"),
-        "pin_memory": train_cfg.get("pin_memory"),
-        "lora_r": model_cfg.get("lora_r"),
-        "lora_alpha": model_cfg.get("lora_alpha"),
-        "lora_target_modules": model_cfg.get("lora_target_modules"),
-        "lora_dropout": model_cfg.get("lora_dropout"),
-        "lora_bias": model_cfg.get("lora_bias"),
-    }
+    runtime = collect_config_values(train_cfg, TRAIN_CONFIG_FIELDS)
+    runtime.update(collect_config_values(model_cfg, MODEL_CONFIG_FIELDS))
 
     cli_overrides = {
         key: value
@@ -282,77 +240,11 @@ def build_runtime_config(args):
     }
     runtime.update(cli_overrides)
 
-    required_keys = [
-        "model_name_or_path",
-        "checkpoint_dir",
-        "data_file_path",
-        "max_length",
-        "load_in_8bit",
-        "batch_size",
-        "shuffle",
-        "auto_pad_batch",
-        "epochs",
-        "gradient_accumulation_steps",
-        "lr",
-        "warmup_steps",
-        "max_steps",
-        "save_steps",
-        "seed",
-        "num_workers",
-        "pin_memory",
-        "lora_r",
-        "lora_alpha",
-        "lora_target_modules",
-        "lora_dropout",
-        "lora_bias",
-    ]
-    missing = [key for key in required_keys if runtime.get(key) is None]
-    if missing:
-        raise ValueError(f"train/model 配置缺少字段: {', '.join(missing)}")
+    validate_runtime_values(runtime)
 
+    apply_runtime_casts(runtime)
     runtime["train_config_path"] = train_config_path
     runtime["model_config_path"] = model_config_path
-    runtime["model_name_or_path"] = str(resolve_path(runtime["model_name_or_path"]))
-    runtime["checkpoint_dir"] = str(resolve_path(runtime["checkpoint_dir"]))
-    runtime["data_file_path"] = str(resolve_path(runtime["data_file_path"]))
-    runtime["max_length"] = int(runtime["max_length"])
-    runtime["load_in_8bit"] = bool(runtime["load_in_8bit"])
-    runtime["batch_size"] = int(runtime["batch_size"])
-    runtime["shuffle"] = bool(runtime["shuffle"])
-    runtime["auto_pad_batch"] = bool(runtime["auto_pad_batch"])
-    runtime["epochs"] = int(runtime["epochs"])
-    runtime["gradient_accumulation_steps"] = int(runtime["gradient_accumulation_steps"])
-    runtime["lr"] = float(runtime["lr"])
-    runtime["warmup_steps"] = int(runtime["warmup_steps"])
-    runtime["max_steps"] = int(runtime["max_steps"])
-    runtime["save_steps"] = int(runtime["save_steps"])
-    runtime["seed"] = int(runtime["seed"])
-    runtime["num_workers"] = int(runtime["num_workers"])
-    runtime["pin_memory"] = bool(runtime["pin_memory"])
-    runtime["lora_r"] = int(runtime["lora_r"])
-    runtime["lora_alpha"] = int(runtime["lora_alpha"])
-    runtime["lora_target_modules"] = parse_target_modules(runtime["lora_target_modules"])
-    runtime["lora_dropout"] = float(runtime["lora_dropout"])
-    runtime["lora_bias"] = str(runtime["lora_bias"])
-
-    if runtime["max_length"] <= 0:
-        raise ValueError("max_length 必须大于 0。")
-    if runtime["batch_size"] <= 0:
-        raise ValueError("batch_size 必须大于 0。")
-    if runtime["gradient_accumulation_steps"] <= 0:
-        raise ValueError("gradient_accumulation_steps 必须大于 0。")
-    if runtime["epochs"] <= 0:
-        raise ValueError("epochs 必须大于 0。")
-    if runtime["max_steps"] <= 0:
-        raise ValueError("max_steps 必须大于 0。")
-    if runtime["save_steps"] <= 0:
-        raise ValueError("save_steps 必须大于 0。")
-    if runtime["warmup_steps"] < 0:
-        raise ValueError("warmup_steps 不能小于 0。")
-    if runtime["num_workers"] < 0:
-        raise ValueError("num_workers 不能小于 0。")
-    if runtime["lora_r"] <= 0 or runtime["lora_alpha"] <= 0:
-        raise ValueError("LoRA rank 和 alpha 必须大于 0。")
     return runtime
 
 
