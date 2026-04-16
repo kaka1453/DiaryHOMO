@@ -3,7 +3,7 @@ checkpoint_dir: checkpoint/old_ckpt/ka512-7b
 data_file_path: data/dataset/json/boa_512.jsonl
 
 max_length: 512
-load_in_8bit: true
+quantization_mode: 4bit
 batch_size: 3
 shuffle: true
 auto_pad_batch: true

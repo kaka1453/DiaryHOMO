@@ -14,7 +14,7 @@ from datasets import load_dataset
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from torch.utils.data import DataLoader, Sampler
 from tqdm import tqdm
-from transformers import AutoModelForCausalLM, AutoTokenizer, get_scheduler
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, get_scheduler
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -26,7 +26,7 @@ TRAIN_CONFIG_FIELDS = [
     "checkpoint_dir",
     "data_file_path",
     "max_length",
-    "load_in_8bit",
+    "quantization_mode",
     "batch_size",
     "shuffle",
     "auto_pad_batch",
@@ -64,7 +64,7 @@ INT_FIELDS = {
     "lora_alpha",
 }
 FLOAT_FIELDS = {"lr", "lora_dropout"}
-BOOL_FIELDS = {"load_in_8bit", "shuffle", "auto_pad_batch", "pin_memory"}
+BOOL_FIELDS = {"shuffle", "auto_pad_batch", "pin_memory"}
 POSITIVE_FIELDS = {
     "max_length",
     "batch_size",
@@ -76,6 +76,7 @@ POSITIVE_FIELDS = {
     "lora_alpha",
 }
 NON_NEGATIVE_FIELDS = {"warmup_steps", "num_workers"}
+ALLOWED_QUANTIZATION_MODES = {"4bit", "8bit", "none"}
 
 
 def str2bool(value):
@@ -94,7 +95,12 @@ CLI_OVERRIDE_SPECS = [
     ("--checkpoint-dir", "checkpoint_dir", str, "Override checkpoint output directory from config."),
     ("--data-file-path", "data_file_path", str, "Override training dataset path from config."),
     ("--max-length", "max_length", int, "Override max sequence length from config."),
-    ("--load-in-8bit", "load_in_8bit", str2bool, "Override 8bit loading switch from config."),
+    (
+        "--quantization-mode",
+        "quantization_mode",
+        str,
+        "Override quantization mode from config: 4bit, 8bit, or none.",
+    ),
     ("--batch-size", "batch_size", int, "Override batch size from config."),
     ("--shuffle", "shuffle", str2bool, "Override whether sorted batches are shuffled between epochs."),
     ("--auto-pad-batch", "auto_pad_batch", str2bool, "Override adaptive padding switch from config."),
@@ -135,6 +141,30 @@ def parse_target_modules(value):
     if not modules:
         raise ValueError("lora_target_modules 不能为空。")
     return modules
+
+
+def normalize_quantization_mode(value):
+    if value is None:
+        return None
+    normalized = str(value).strip().lower()
+    aliases = {
+        "4": "4bit",
+        "4bit": "4bit",
+        "nf4": "4bit",
+        "8": "8bit",
+        "8bit": "8bit",
+        "int8": "8bit",
+        "16": "none",
+        "fp16": "none",
+        "bf16": "none",
+        "full": "none",
+        "none": "none",
+        "off": "none",
+        "false": "none",
+    }
+    if normalized not in aliases:
+        raise ValueError(f"不支持的 quantization_mode: {value}")
+    return aliases[normalized]
 
 
 def build_parser():
@@ -203,11 +233,12 @@ def apply_runtime_casts(runtime):
         runtime[field] = float(runtime[field])
     for field in BOOL_FIELDS:
         runtime[field] = bool(runtime[field])
+    runtime["quantization_mode"] = normalize_quantization_mode(runtime["quantization_mode"])
     runtime["lora_target_modules"] = parse_target_modules(runtime["lora_target_modules"])
     runtime["lora_bias"] = str(runtime["lora_bias"])
 
 
-def validate_runtime_values(runtime):
+def validate_required_fields(runtime):
     missing = [
         field
         for field in TRAIN_CONFIG_FIELDS + MODEL_CONFIG_FIELDS
@@ -216,6 +247,12 @@ def validate_runtime_values(runtime):
     if missing:
         raise ValueError(f"train/model 配置缺少字段: {', '.join(missing)}")
 
+
+def validate_runtime_values(runtime):
+    if runtime["quantization_mode"] not in ALLOWED_QUANTIZATION_MODES:
+        raise ValueError(
+            f"quantization_mode 必须是 {', '.join(sorted(ALLOWED_QUANTIZATION_MODES))} 之一。"
+        )
     for field in POSITIVE_FIELDS:
         if runtime[field] <= 0:
             raise ValueError(f"{field} 必须大于 0。")
@@ -232,6 +269,8 @@ def build_runtime_config(args):
 
     runtime = collect_config_values(train_cfg, TRAIN_CONFIG_FIELDS)
     runtime.update(collect_config_values(model_cfg, MODEL_CONFIG_FIELDS))
+    if runtime.get("quantization_mode") is None and "load_in_8bit" in train_cfg:
+        runtime["quantization_mode"] = "8bit" if bool(train_cfg["load_in_8bit"]) else "none"
 
     cli_overrides = {
         key: value
@@ -240,9 +279,9 @@ def build_runtime_config(args):
     }
     runtime.update(cli_overrides)
 
-    validate_runtime_values(runtime)
-
+    validate_required_fields(runtime)
     apply_runtime_casts(runtime)
+    validate_runtime_values(runtime)
     runtime["train_config_path"] = train_config_path
     runtime["model_config_path"] = model_config_path
     return runtime
@@ -450,6 +489,7 @@ def simulate_pipeline(runtime):
 
     summary = {
         "dataset_size": len(dataset),
+        "quantization_mode": runtime["quantization_mode"],
         "batch_input_shape": list(first_batch["input_ids"].shape),
         "batch_labels_shape": list(first_batch["labels"].shape),
         "first_batch_max_token_id": int(first_batch["input_ids"].max().item()),
@@ -462,15 +502,36 @@ def simulate_pipeline(runtime):
     print("Train 模拟检查通过。")
 
 
+def build_quantization_config(runtime):
+    if runtime["quantization_mode"] == "4bit":
+        return BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
+        )
+    if runtime["quantization_mode"] == "8bit":
+        return BitsAndBytesConfig(load_in_8bit=True)
+    return None
+
+
 def load_model(runtime, lora_config):
+    quantization_config = build_quantization_config(runtime)
+    load_kwargs = {
+        "device_map": "auto",
+        "trust_remote_code": True,
+        "torch_dtype": torch.float16,
+    }
+    if quantization_config is not None:
+        load_kwargs["quantization_config"] = quantization_config
+
     model = AutoModelForCausalLM.from_pretrained(
         runtime["model_name_or_path"],
-        load_in_8bit=runtime["load_in_8bit"],
-        device_map="auto",
-        trust_remote_code=True,
+        **load_kwargs,
     )
-    if runtime["load_in_8bit"]:
+    if runtime["quantization_mode"] != "none":
         model = prepare_model_for_kbit_training(model)
+    model.config.use_cache = False
     model.gradient_checkpointing_enable()
     model = get_peft_model(model, lora_config)
     return model
