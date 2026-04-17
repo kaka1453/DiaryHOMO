@@ -1,0 +1,941 @@
+import argparse
+import json
+import math
+import os
+import random
+import subprocess
+import time
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import torch
+import yaml
+from accelerate import Accelerator
+from datasets import load_dataset
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from torch.utils.data import DataLoader, Sampler
+from tqdm import tqdm
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, get_scheduler
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_TRAIN_CONFIG_PATH = PROJECT_ROOT / "config" / "train.yaml"
+DEFAULT_MODEL_CONFIG_PATH = PROJECT_ROOT / "config" / "model.yaml"
+
+TRAIN_CONFIG_FIELDS = [
+    "model_name_or_path",
+    "checkpoint_dir",
+    "data_file_path",
+    "max_length",
+    "quantization_mode",
+    "batch_size",
+    "shuffle",
+    "auto_pad_batch",
+    "epochs",
+    "gradient_accumulation_steps",
+    "lr",
+    "warmup_steps",
+    "max_steps",
+    "save_steps",
+    "seed",
+    "num_workers",
+    "pin_memory",
+]
+
+MODEL_CONFIG_FIELDS = [
+    "lora_r",
+    "lora_alpha",
+    "lora_target_modules",
+    "lora_dropout",
+    "lora_bias",
+]
+
+PATH_FIELDS = {"model_name_or_path", "checkpoint_dir", "data_file_path"}
+INT_FIELDS = {
+    "max_length",
+    "batch_size",
+    "epochs",
+    "gradient_accumulation_steps",
+    "warmup_steps",
+    "max_steps",
+    "save_steps",
+    "seed",
+    "num_workers",
+    "lora_r",
+    "lora_alpha",
+}
+FLOAT_FIELDS = {"lr", "lora_dropout"}
+BOOL_FIELDS = {"shuffle", "auto_pad_batch", "pin_memory"}
+POSITIVE_FIELDS = {
+    "max_length",
+    "batch_size",
+    "gradient_accumulation_steps",
+    "epochs",
+    "max_steps",
+    "save_steps",
+    "lora_r",
+    "lora_alpha",
+}
+NON_NEGATIVE_FIELDS = {"warmup_steps", "num_workers"}
+ALLOWED_QUANTIZATION_MODES = {"4bit", "8bit", "none"}
+
+
+def str2bool(value):
+    if isinstance(value, bool):
+        return value
+    normalized = str(value).strip().lower()
+    if normalized in {"1", "true", "t", "yes", "y", "on"}:
+        return True
+    if normalized in {"0", "false", "f", "no", "n", "off"}:
+        return False
+    raise argparse.ArgumentTypeError(f"无法解析布尔值: {value}")
+
+
+CLI_OVERRIDE_SPECS = [
+    ("--model-name-or-path", "model_name_or_path", str, "Override model path from config."),
+    ("--checkpoint-dir", "checkpoint_dir", str, "Override checkpoint output directory from config."),
+    ("--data-file-path", "data_file_path", str, "Override training dataset path from config."),
+    ("--max-length", "max_length", int, "Override max sequence length from config."),
+    (
+        "--quantization-mode",
+        "quantization_mode",
+        str,
+        "Override quantization mode from config: 4bit, 8bit, or none.",
+    ),
+    ("--batch-size", "batch_size", int, "Override batch size from config."),
+    ("--shuffle", "shuffle", str2bool, "Override whether sorted batches are shuffled between epochs."),
+    ("--auto-pad-batch", "auto_pad_batch", str2bool, "Override adaptive padding switch from config."),
+    ("--epochs", "epochs", int, "Override max epoch count from config."),
+    (
+        "--gradient-accumulation-steps",
+        "gradient_accumulation_steps",
+        int,
+        "Override gradient accumulation steps from config.",
+    ),
+    ("--lr", "lr", float, "Override learning rate from config."),
+    ("--warmup-steps", "warmup_steps", int, "Override warmup steps from config."),
+    ("--max-steps", "max_steps", int, "Override total optimizer steps from config."),
+    ("--save-steps", "save_steps", int, "Override checkpoint save interval from config."),
+    ("--seed", "seed", int, "Override random seed from config."),
+    ("--num-workers", "num_workers", int, "Override dataloader worker count from config."),
+    ("--pin-memory", "pin_memory", str2bool, "Override dataloader pin_memory switch from config."),
+    ("--lora-r", "lora_r", int, "Override LoRA rank from model config."),
+    ("--lora-alpha", "lora_alpha", int, "Override LoRA alpha from model config."),
+    (
+        "--lora-target-modules",
+        "lora_target_modules",
+        str,
+        "Override LoRA target modules from model config, comma-separated.",
+    ),
+    ("--lora-dropout", "lora_dropout", float, "Override LoRA dropout from model config."),
+    ("--lora-bias", "lora_bias", str, "Override LoRA bias from model config."),
+]
+
+
+def parse_target_modules(value):
+    if value is None:
+        return None
+    if isinstance(value, list):
+        modules = [str(item).strip() for item in value if str(item).strip()]
+    else:
+        modules = [item.strip() for item in str(value).split(",") if item.strip()]
+    if not modules:
+        raise ValueError("lora_target_modules 不能为空。")
+    return modules
+
+
+def normalize_quantization_mode(value):
+    if value is None:
+        return None
+    normalized = str(value).strip().lower()
+    aliases = {
+        "4": "4bit",
+        "4bit": "4bit",
+        "nf4": "4bit",
+        "8": "8bit",
+        "8bit": "8bit",
+        "int8": "8bit",
+        "16": "none",
+        "fp16": "none",
+        "bf16": "none",
+        "full": "none",
+        "none": "none",
+        "off": "none",
+        "false": "none",
+    }
+    if normalized not in aliases:
+        raise ValueError(f"不支持的 quantization_mode: {value}")
+    return aliases[normalized]
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(description="Qwen LoRA training entrypoint")
+    parser.add_argument(
+        "--config",
+        type=str,
+        default=str(DEFAULT_TRAIN_CONFIG_PATH),
+        help="Training YAML config file path.",
+    )
+    parser.add_argument(
+        "--model-config",
+        dest="model_config",
+        type=str,
+        default=str(DEFAULT_MODEL_CONFIG_PATH),
+        help="Model YAML config file path.",
+    )
+    for flag, dest, value_type, help_text in CLI_OVERRIDE_SPECS:
+        parser.add_argument(
+            flag,
+            dest=dest,
+            type=value_type,
+            default=None,
+            help=help_text,
+        )
+    parser.add_argument(
+        "--dry-run",
+        dest="dry_run",
+        action="store_true",
+        help="Only validate config and print resolved values.",
+    )
+    parser.add_argument(
+        "--simulate-only",
+        dest="simulate_only",
+        action="store_true",
+        help="Run a CPU-side simulation without loading the model into VRAM.",
+    )
+    return parser
+
+
+def load_yaml_config(config_path: Path, label: str):
+    with config_path.open("r", encoding="utf-8") as fh:
+        data = yaml.safe_load(fh) or {}
+    if not isinstance(data, dict):
+        raise ValueError(f"{label} 顶层必须是映射对象。")
+    return data
+
+
+def resolve_path(value: str):
+    path = Path(value)
+    if path.is_absolute():
+        return path
+    return PROJECT_ROOT / path
+
+
+def collect_config_values(config_data, fields):
+    return {field: config_data.get(field) for field in fields}
+
+
+def apply_runtime_casts(runtime):
+    for field in PATH_FIELDS:
+        runtime[field] = str(resolve_path(runtime[field]))
+    for field in INT_FIELDS:
+        runtime[field] = int(runtime[field])
+    for field in FLOAT_FIELDS:
+        runtime[field] = float(runtime[field])
+    for field in BOOL_FIELDS:
+        runtime[field] = bool(runtime[field])
+    runtime["quantization_mode"] = normalize_quantization_mode(runtime["quantization_mode"])
+    runtime["lora_target_modules"] = parse_target_modules(runtime["lora_target_modules"])
+    runtime["lora_bias"] = str(runtime["lora_bias"])
+
+
+def validate_required_fields(runtime):
+    missing = [
+        field
+        for field in TRAIN_CONFIG_FIELDS + MODEL_CONFIG_FIELDS
+        if runtime.get(field) is None
+    ]
+    if missing:
+        raise ValueError(f"train/model 配置缺少字段: {', '.join(missing)}")
+
+
+def validate_runtime_values(runtime):
+    if runtime["quantization_mode"] not in ALLOWED_QUANTIZATION_MODES:
+        raise ValueError(
+            f"quantization_mode 必须是 {', '.join(sorted(ALLOWED_QUANTIZATION_MODES))} 之一。"
+        )
+    for field in POSITIVE_FIELDS:
+        if runtime[field] <= 0:
+            raise ValueError(f"{field} 必须大于 0。")
+    for field in NON_NEGATIVE_FIELDS:
+        if runtime[field] < 0:
+            raise ValueError(f"{field} 不能小于 0。")
+
+
+def build_runtime_config(args):
+    train_config_path = Path(args.config).expanduser().resolve()
+    model_config_path = Path(args.model_config).expanduser().resolve()
+    train_cfg = load_yaml_config(train_config_path, "config/train.yaml")
+    model_cfg = load_yaml_config(model_config_path, "config/model.yaml")
+
+    runtime = collect_config_values(train_cfg, TRAIN_CONFIG_FIELDS)
+    runtime.update(collect_config_values(model_cfg, MODEL_CONFIG_FIELDS))
+    if runtime.get("quantization_mode") is None and "load_in_8bit" in train_cfg:
+        runtime["quantization_mode"] = "8bit" if bool(train_cfg["load_in_8bit"]) else "none"
+
+    cli_overrides = {
+        key: value
+        for key, value in vars(args).items()
+        if key not in {"config", "model_config", "dry_run", "simulate_only"} and value is not None
+    }
+    runtime.update(cli_overrides)
+
+    validate_required_fields(runtime)
+    apply_runtime_casts(runtime)
+    validate_runtime_values(runtime)
+    runtime["train_config_path"] = train_config_path
+    runtime["model_config_path"] = model_config_path
+    return runtime
+
+
+def dump_runtime_config(runtime):
+    printable = dict(runtime)
+    printable["train_config_path"] = str(printable["train_config_path"])
+    printable["model_config_path"] = str(printable["model_config_path"])
+    return json.dumps(printable, ensure_ascii=False, indent=2)
+
+
+def bytes_to_mib(value):
+    return round(float(value) / (1024 * 1024), 2)
+
+
+def safe_round_delta(current, previous):
+    if current is None or previous is None:
+        return None
+    return round(current - previous, 2)
+
+
+def query_nvidia_smi_memory():
+    info = {
+        "nvidia_global_used_mib": None,
+        "nvidia_global_free_mib": None,
+        "nvidia_process_used_mib": None,
+    }
+    try:
+        result = subprocess.run(
+            [
+                "nvidia-smi",
+                "--query-gpu=memory.used,memory.free",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        first_line = next((line.strip() for line in result.stdout.splitlines() if line.strip()), "")
+        if first_line:
+            used_str, free_str = [item.strip() for item in first_line.split(",")[:2]]
+            info["nvidia_global_used_mib"] = float(used_str)
+            info["nvidia_global_free_mib"] = float(free_str)
+    except Exception:
+        pass
+
+    try:
+        result = subprocess.run(
+            [
+                "nvidia-smi",
+                "--query-compute-apps=pid,used_gpu_memory",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        current_pid = os.getpid()
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if not line or "," not in line:
+                continue
+            pid_str, used_str = [item.strip() for item in line.split(",", 1)]
+            if pid_str.isdigit() and int(pid_str) == current_pid:
+                info["nvidia_process_used_mib"] = float(used_str)
+                break
+    except Exception:
+        pass
+    return info
+
+
+def format_memory_value(value):
+    if value is None:
+        return "n/a"
+    return f"{value:.2f} MiB"
+
+
+def capture_memory_snapshot(records, label, note=None):
+    record = {
+        "label": label,
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "note": note,
+        "torch_allocated_mib": None,
+        "torch_reserved_mib": None,
+        "torch_max_allocated_mib": None,
+        "torch_max_reserved_mib": None,
+        "cuda_free_mib": None,
+        "cuda_total_mib": None,
+    }
+
+    if torch.cuda.is_available():
+        try:
+            torch.cuda.synchronize()
+        except Exception:
+            pass
+        try:
+            device = torch.cuda.current_device()
+            free_bytes, total_bytes = torch.cuda.mem_get_info(device)
+            record.update(
+                {
+                    "torch_allocated_mib": bytes_to_mib(torch.cuda.memory_allocated(device)),
+                    "torch_reserved_mib": bytes_to_mib(torch.cuda.memory_reserved(device)),
+                    "torch_max_allocated_mib": bytes_to_mib(torch.cuda.max_memory_allocated(device)),
+                    "torch_max_reserved_mib": bytes_to_mib(torch.cuda.max_memory_reserved(device)),
+                    "cuda_free_mib": bytes_to_mib(free_bytes),
+                    "cuda_total_mib": bytes_to_mib(total_bytes),
+                }
+            )
+        except Exception:
+            pass
+
+    record.update(query_nvidia_smi_memory())
+
+    previous = records[-1] if records else None
+    baseline = records[0] if records else None
+    tracked_keys = [
+        "torch_allocated_mib",
+        "torch_reserved_mib",
+        "torch_max_allocated_mib",
+        "torch_max_reserved_mib",
+        "nvidia_global_used_mib",
+        "nvidia_process_used_mib",
+    ]
+    for key in tracked_keys:
+        record[f"{key}_delta_from_prev"] = safe_round_delta(record.get(key), previous.get(key) if previous else None)
+        record[f"{key}_delta_from_start"] = safe_round_delta(record.get(key), baseline.get(key) if baseline else None)
+
+    records.append(record)
+
+    message = (
+        f"[MEM] {label} | "
+        f"torch_alloc={format_memory_value(record['torch_allocated_mib'])} | "
+        f"torch_reserved={format_memory_value(record['torch_reserved_mib'])} | "
+        f"torch_peak_alloc={format_memory_value(record['torch_max_allocated_mib'])} | "
+        f"proc_gpu={format_memory_value(record['nvidia_process_used_mib'])} | "
+        f"gpu_used={format_memory_value(record['nvidia_global_used_mib'])}"
+    )
+    if note:
+        message += f" | {note}"
+    print(message, flush=True)
+    return record
+
+
+def summarize_memory_records(records):
+    if not records:
+        return {}
+
+    def peak_for(key):
+        valid = [record for record in records if record.get(key) is not None]
+        if not valid:
+            return None
+        peak_record = max(valid, key=lambda item: item[key])
+        return {
+            "label": peak_record["label"],
+            "value_mib": peak_record[key],
+            "delta_from_start_mib": peak_record.get(f"{key}_delta_from_start"),
+        }
+
+    return {
+        "num_snapshots": len(records),
+        "baseline": records[0],
+        "peaks": {
+            "torch_allocated_mib": peak_for("torch_allocated_mib"),
+            "torch_reserved_mib": peak_for("torch_reserved_mib"),
+            "torch_max_allocated_mib": peak_for("torch_max_allocated_mib"),
+            "torch_max_reserved_mib": peak_for("torch_max_reserved_mib"),
+            "nvidia_process_used_mib": peak_for("nvidia_process_used_mib"),
+            "nvidia_global_used_mib": peak_for("nvidia_global_used_mib"),
+        },
+        "stage_overview": [
+            {
+                "label": record["label"],
+                "note": record.get("note"),
+                "torch_allocated_mib": record.get("torch_allocated_mib"),
+                "torch_reserved_mib": record.get("torch_reserved_mib"),
+                "nvidia_process_used_mib": record.get("nvidia_process_used_mib"),
+                "delta_process_from_start_mib": record.get("nvidia_process_used_mib_delta_from_start"),
+                "delta_reserved_from_start_mib": record.get("torch_reserved_mib_delta_from_start"),
+            }
+            for record in records
+        ],
+    }
+
+
+def write_memory_reports(runtime, records):
+    checkpoint_dir = Path(runtime["checkpoint_dir"])
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    trace_path = checkpoint_dir / "memory_trace.jsonl"
+    summary_path = checkpoint_dir / "memory_summary.json"
+
+    with trace_path.open("w", encoding="utf-8") as fh:
+        for record in records:
+            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    summary = summarize_memory_records(records)
+    with summary_path.open("w", encoding="utf-8") as fh:
+        json.dump(summary, fh, ensure_ascii=False, indent=2)
+
+    return trace_path, summary_path
+
+
+def count_parameters(model):
+    total = sum(parameter.numel() for parameter in model.parameters())
+    trainable = sum(parameter.numel() for parameter in model.parameters() if parameter.requires_grad)
+    return total, trainable
+
+
+def set_reproducibility(seed):
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    if hasattr(torch.backends, "cudnn"):
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+
+def validate_paths(runtime):
+    model_path = Path(runtime["model_name_or_path"])
+    data_path = Path(runtime["data_file_path"])
+    checkpoint_dir = Path(runtime["checkpoint_dir"])
+
+    if not model_path.exists():
+        raise FileNotFoundError(f"模型路径不存在: {model_path}")
+    if not data_path.exists():
+        raise FileNotFoundError(f"数据集路径不存在: {data_path}")
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+
+class DataCollatorForCausalLMWith8xPadding:
+    def __init__(self, tokenizer, max_length=None, pad_to_max_length=False, label_pad_token_id=-100):
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+        self.pad_to_max_length = pad_to_max_length
+        self.label_pad_token_id = label_pad_token_id
+
+    def __call__(self, features):
+        batch_max_len = self.max_length if self.pad_to_max_length else max(len(f["input_ids"]) for f in features)
+        padded_len = int(math.ceil(batch_max_len / 8) * 8)
+        batch = self.tokenizer.pad(
+            features,
+            padding="max_length",
+            max_length=padded_len,
+            return_tensors="pt",
+        )
+        labels = batch["input_ids"].clone()
+        labels[batch["attention_mask"] == 0] = self.label_pad_token_id
+        batch["labels"] = labels
+        return batch
+
+
+class SortedBatchSampler(Sampler):
+    def __init__(self, dataset, batch_size, shuffle=True, seed=42):
+        self.dataset = dataset
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.seed = seed
+        self.iteration = 0
+        self.lengths = [len(item["input_ids"]) for item in dataset]
+
+    def __iter__(self):
+        indices = list(range(len(self.dataset)))
+        indices.sort(key=lambda idx: self.lengths[idx], reverse=True)
+        if self.shuffle:
+            batch_indices = [
+                indices[i : i + self.batch_size]
+                for i in range(0, len(indices), self.batch_size)
+            ]
+            rng = random.Random(self.seed + self.iteration)
+            rng.shuffle(batch_indices)
+            indices = [idx for batch in batch_indices for idx in batch]
+        self.iteration += 1
+        return iter(indices)
+
+    def __len__(self):
+        return len(self.dataset)
+
+
+def load_tokenizer(runtime):
+    tokenizer = AutoTokenizer.from_pretrained(
+        runtime["model_name_or_path"],
+        use_fast=False,
+        trust_remote_code=True,
+    )
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    return tokenizer
+
+
+def load_training_dataset(runtime, tokenizer):
+    dataset = load_dataset("json", data_files={"train": runtime["data_file_path"]})["train"]
+    if "text" not in dataset.column_names:
+        raise ValueError(f"训练数据缺少 text 字段: {dataset.column_names}")
+
+    def tokenize(batch):
+        return tokenizer(
+            batch["text"],
+            truncation=True,
+            max_length=runtime["max_length"],
+            return_attention_mask=True,
+        )
+
+    tokenized_dataset = dataset.map(tokenize, batched=True, remove_columns=dataset.column_names)
+    return tokenized_dataset
+
+
+def build_data_loader(runtime, dataset, tokenizer):
+    data_collator = DataCollatorForCausalLMWith8xPadding(
+        tokenizer=tokenizer,
+        max_length=runtime["max_length"],
+        pad_to_max_length=not runtime["auto_pad_batch"],
+        label_pad_token_id=-100,
+    )
+    sampler = SortedBatchSampler(
+        dataset=dataset,
+        batch_size=runtime["batch_size"],
+        shuffle=runtime["shuffle"],
+        seed=runtime["seed"],
+    )
+    train_loader = DataLoader(
+        dataset,
+        batch_size=runtime["batch_size"],
+        sampler=sampler,
+        collate_fn=data_collator,
+        num_workers=runtime["num_workers"],
+        pin_memory=runtime["pin_memory"],
+    )
+    return train_loader
+
+
+def create_lora_config(runtime):
+    return LoraConfig(
+        r=runtime["lora_r"],
+        lora_alpha=runtime["lora_alpha"],
+        target_modules=runtime["lora_target_modules"],
+        lora_dropout=runtime["lora_dropout"],
+        bias=runtime["lora_bias"],
+        task_type="CAUSAL_LM",
+    )
+
+
+def compute_schedule(runtime, train_loader):
+    num_update_steps_per_epoch = max(
+        1,
+        math.ceil(len(train_loader) / runtime["gradient_accumulation_steps"]),
+    )
+    total_possible_steps = num_update_steps_per_epoch * runtime["epochs"]
+    planned_training_steps = min(runtime["max_steps"], total_possible_steps)
+    return {
+        "num_update_steps_per_epoch": num_update_steps_per_epoch,
+        "total_possible_steps": total_possible_steps,
+        "planned_training_steps": planned_training_steps,
+    }
+
+
+def save_runtime_snapshot(runtime):
+    checkpoint_dir = Path(runtime["checkpoint_dir"])
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    snapshot_path = checkpoint_dir / "resolved_train_runtime.json"
+    with snapshot_path.open("w", encoding="utf-8") as fh:
+        fh.write(dump_runtime_config(runtime))
+    return snapshot_path
+
+
+def plot_metrics(metrics, save_path):
+    save_path = Path(save_path)
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    axes = axes.flatten()
+    titles = ["Loss", "Perplexity", "Learning Rate", "Step Time", "Throughput"]
+    colors = ["b", "orange", "red", "purple", "brown"]
+    keys = ["loss", "perplexity", "lr", "step_time", "throughput"]
+
+    for ax, title, key, color in zip(axes, titles, keys, colors):
+        ax.plot(range(1, len(metrics[key]) + 1), metrics[key], marker="o", color=color)
+        ax.set_title(title)
+        ax.set_xlabel("Epoch")
+        ax.set_ylabel(title)
+
+    if len(axes) > len(keys):
+        for ax in axes[len(keys):]:
+            fig.delaxes(ax)
+
+    plt.tight_layout()
+    plt.savefig(save_path)
+    plt.close(fig)
+
+
+def simulate_pipeline(runtime):
+    memory_records = []
+    capture_memory_snapshot(memory_records, "simulate_start")
+    validate_paths(runtime)
+    set_reproducibility(runtime["seed"])
+    capture_memory_snapshot(memory_records, "after_seed")
+    tokenizer = load_tokenizer(runtime)
+    capture_memory_snapshot(memory_records, "after_tokenizer")
+    dataset = load_training_dataset(runtime, tokenizer)
+    capture_memory_snapshot(memory_records, "after_dataset_tokenized", note=f"dataset_size={len(dataset)}")
+    train_loader = build_data_loader(runtime, dataset, tokenizer)
+    capture_memory_snapshot(memory_records, "after_dataloader", note=f"num_batches={len(train_loader)}")
+    lora_config = create_lora_config(runtime)
+    schedule = compute_schedule(runtime, train_loader)
+    first_batch = next(iter(train_loader))
+    capture_memory_snapshot(memory_records, "after_first_batch")
+
+    summary = {
+        "dataset_size": len(dataset),
+        "quantization_mode": runtime["quantization_mode"],
+        "batch_input_shape": list(first_batch["input_ids"].shape),
+        "batch_labels_shape": list(first_batch["labels"].shape),
+        "first_batch_max_token_id": int(first_batch["input_ids"].max().item()),
+        "lora_target_modules": sorted(list(lora_config.target_modules)),
+        "num_update_steps_per_epoch": schedule["num_update_steps_per_epoch"],
+        "planned_training_steps": schedule["planned_training_steps"],
+        "checkpoint_dir": runtime["checkpoint_dir"],
+    }
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    print("Train 模拟检查通过。")
+
+
+def build_quantization_config(runtime):
+    if runtime["quantization_mode"] == "4bit":
+        return BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
+        )
+    if runtime["quantization_mode"] == "8bit":
+        return BitsAndBytesConfig(load_in_8bit=True)
+    return None
+
+
+def load_model(runtime, lora_config, memory_records):
+    capture_memory_snapshot(memory_records, "before_model_load")
+    quantization_config = build_quantization_config(runtime)
+    load_kwargs = {
+        "device_map": "auto",
+        "trust_remote_code": True,
+        "torch_dtype": torch.float16,
+    }
+    if quantization_config is not None:
+        load_kwargs["quantization_config"] = quantization_config
+
+    model = AutoModelForCausalLM.from_pretrained(
+        runtime["model_name_or_path"],
+        **load_kwargs,
+    )
+    capture_memory_snapshot(memory_records, "after_base_model_load", note=f"quant={runtime['quantization_mode']}")
+    if runtime["quantization_mode"] != "none":
+        model = prepare_model_for_kbit_training(model)
+        capture_memory_snapshot(memory_records, "after_kbit_prepare")
+    model.config.use_cache = False
+    model.gradient_checkpointing_enable()
+    capture_memory_snapshot(memory_records, "after_gradient_checkpointing")
+    model = get_peft_model(model, lora_config)
+    total_params, trainable_params = count_parameters(model)
+    capture_memory_snapshot(
+        memory_records,
+        "after_lora_injection",
+        note=f"trainable={trainable_params}, total={total_params}",
+    )
+    return model
+
+
+def train(runtime):
+    memory_records = []
+    global_step = 0
+    trace_path = None
+    summary_path = None
+    capture_memory_snapshot(memory_records, "train_start", note=f"pid={os.getpid()}")
+    validate_paths(runtime)
+    set_reproducibility(runtime["seed"])
+    capture_memory_snapshot(memory_records, "after_seed")
+    snapshot_path = save_runtime_snapshot(runtime)
+    capture_memory_snapshot(memory_records, "after_runtime_snapshot")
+
+    accelerator = Accelerator(
+        mixed_precision="fp16",
+        gradient_accumulation_steps=runtime["gradient_accumulation_steps"],
+    )
+    capture_memory_snapshot(memory_records, "after_accelerator_init")
+
+    tokenizer = load_tokenizer(runtime)
+    capture_memory_snapshot(memory_records, "after_tokenizer")
+    dataset = load_training_dataset(runtime, tokenizer)
+    capture_memory_snapshot(memory_records, "after_dataset_tokenized", note=f"dataset_size={len(dataset)}")
+    train_loader = build_data_loader(runtime, dataset, tokenizer)
+    capture_memory_snapshot(memory_records, "after_dataloader", note=f"num_batches={len(train_loader)}")
+    lora_config = create_lora_config(runtime)
+    capture_memory_snapshot(memory_records, "after_lora_config")
+    schedule = compute_schedule(runtime, train_loader)
+    capture_memory_snapshot(
+        memory_records,
+        "after_schedule",
+        note=(
+            f"updates_per_epoch={schedule['num_update_steps_per_epoch']}, "
+            f"planned_steps={schedule['planned_training_steps']}"
+        ),
+    )
+
+    model = load_model(runtime, lora_config, memory_records)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=runtime["lr"])
+    capture_memory_snapshot(memory_records, "after_optimizer")
+    lr_scheduler = get_scheduler(
+        "linear",
+        optimizer=optimizer,
+        num_warmup_steps=runtime["warmup_steps"],
+        num_training_steps=schedule["planned_training_steps"],
+    )
+    capture_memory_snapshot(memory_records, "after_scheduler")
+
+    model, optimizer, train_loader, lr_scheduler = accelerator.prepare(
+        model,
+        optimizer,
+        train_loader,
+        lr_scheduler,
+    )
+    capture_memory_snapshot(memory_records, "after_accelerator_prepare")
+
+    metrics = {
+        "loss": [],
+        "perplexity": [],
+        "lr": [],
+        "step_time": [],
+        "throughput": [],
+    }
+
+    accelerator.print(f"已写入实验快照: {snapshot_path}")
+    epoch = 0
+
+    try:
+        while global_step < runtime["max_steps"] and epoch < runtime["epochs"]:
+            model.train()
+            epoch_loss = 0.0
+            epoch_lr = []
+            epoch_step_time = []
+            epoch_throughput = []
+            optimizer_updates = 0
+            start_time = time.time()
+            progress = tqdm(
+                train_loader,
+                desc=f"Epoch {epoch + 1}",
+                leave=False,
+                disable=not accelerator.is_local_main_process,
+            )
+
+            for step, batch in enumerate(progress):
+                if global_step >= runtime["max_steps"]:
+                    break
+
+                step_start = time.time()
+                if epoch == 0 and step == 0:
+                    capture_memory_snapshot(memory_records, "before_first_forward")
+                outputs = model(**batch)
+                if epoch == 0 and step == 0:
+                    capture_memory_snapshot(memory_records, "after_first_forward")
+                loss = outputs.loss / runtime["gradient_accumulation_steps"]
+                accelerator.backward(loss)
+                if epoch == 0 and step == 0:
+                    capture_memory_snapshot(memory_records, "after_first_backward")
+
+                is_last_batch = (step + 1) == len(train_loader)
+                should_step = ((step + 1) % runtime["gradient_accumulation_steps"] == 0) or is_last_batch
+                if not should_step:
+                    continue
+
+                optimizer.step()
+                lr_scheduler.step()
+                optimizer.zero_grad()
+                global_step += 1
+                optimizer_updates += 1
+                epoch_loss += loss.item() * runtime["gradient_accumulation_steps"]
+
+                step_time = time.time() - step_start
+                epoch_lr.append(lr_scheduler.get_last_lr()[0])
+                epoch_step_time.append(step_time)
+                epoch_throughput.append(runtime["batch_size"] / max(step_time, 1e-6))
+                if epoch == 0 and global_step == 1:
+                    capture_memory_snapshot(
+                        memory_records,
+                        "after_first_optimizer_step",
+                        note=f"loss={loss.item() * runtime['gradient_accumulation_steps']:.4f}",
+                    )
+
+                if global_step % runtime["save_steps"] == 0:
+                    capture_memory_snapshot(memory_records, "before_checkpoint_save", note=f"step={global_step}")
+                    save_dir = Path(runtime["checkpoint_dir"]) / f"step_{global_step}"
+                    save_dir.mkdir(parents=True, exist_ok=True)
+                    unwrapped = accelerator.unwrap_model(model)
+                    unwrapped.save_pretrained(save_dir, safe_serialization=True)
+                    tokenizer.save_pretrained(save_dir)
+                    accelerator.print(f"模型已保存至 {save_dir}")
+                    capture_memory_snapshot(memory_records, "after_checkpoint_save", note=f"step={global_step}")
+
+                    metrics_path = (
+                        Path(runtime["checkpoint_dir"])
+                        / "metrics_images"
+                        / f"metrics_up_to_step_{global_step}.png"
+                    )
+                    plot_metrics(metrics, metrics_path)
+                    accelerator.print(f"指标图已保存至 {metrics_path}")
+                    capture_memory_snapshot(memory_records, "after_metrics_plot", note=f"step={global_step}")
+
+            if optimizer_updates == 0:
+                accelerator.print("当前 epoch 未产生优化步，训练提前结束。")
+                break
+
+            avg_loss = epoch_loss / optimizer_updates
+            metrics["loss"].append(avg_loss)
+            metrics["perplexity"].append(math.exp(min(avg_loss, 20)))
+            metrics["lr"].append(sum(epoch_lr) / len(epoch_lr))
+            metrics["step_time"].append(sum(epoch_step_time) / len(epoch_step_time))
+            metrics["throughput"].append(sum(epoch_throughput) / len(epoch_throughput))
+
+            epoch += 1
+            epoch_elapsed = time.time() - start_time
+            capture_memory_snapshot(memory_records, "after_epoch", note=f"epoch={epoch}, avg_loss={avg_loss:.4f}")
+            accelerator.print(
+                f"Epoch {epoch} | avg_loss: {metrics['loss'][-1]:.4f} | "
+                f"time: {epoch_elapsed:.1f}s | speed: {epoch_elapsed / max(len(train_loader), 1):.2f}s/step"
+            )
+
+        accelerator.print("全部训练完成。")
+    finally:
+        try:
+            capture_memory_snapshot(memory_records, "train_end", note=f"global_step={global_step}")
+        except Exception as exc:
+            print(f"[MEM] 记录 train_end 失败: {exc}", flush=True)
+        trace_path, summary_path = write_memory_reports(runtime, memory_records)
+        accelerator.print(f"显存轨迹已写入: {trace_path}")
+        accelerator.print(f"显存摘要已写入: {summary_path}")
+
+
+def main():
+    parser = build_parser()
+    args = parser.parse_args()
+    runtime = build_runtime_config(args)
+
+    if args.dry_run:
+        print("Train 配置检查通过。")
+        print(dump_runtime_config(runtime))
+        return
+
+    if args.simulate_only:
+        simulate_pipeline(runtime)
+        return
+
+    train(runtime)
+
+
+if __name__ == "__main__":
+    main()
