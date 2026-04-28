@@ -1,9 +1,9 @@
-model_name_or_path: data/large_language_model/Qwen/Qwen2.5-7B-Instruct
-checkpoint_dir: checkpoint/old_ckpt/qwen7b_boa_256/epoch_103
+model_name_or_path: data/large_language_model/Qwen/Qwen2.5-14B-Instruct
+checkpoint_dir: checkpoint/old_ckpt/qwen14b_boa_256/step_12000
 input_file: generate/input_prompt/inputtest.txt
 output_file: generate/output/test1.md
 device: cuda
-batch_size: 1
+batch_size: 4
 print_prompts: true
 use_chat_template: true
 
@@ -19,7 +19,7 @@ generation:
   temperature: 0.9
   top_p: 0.9
   top_k: 60
-  repetition_penalty: 6.0
+  repetition_penalty: 1.5
   num_beams: 1
   stop_sequences:
     - "\n---"
