@@ -12,6 +12,7 @@ from diary_core.config.common import (
     resolve_path,
     str2bool,
 )
+from diary_core.infer.prompt_debug import normalize_prompt_debug_config
 
 
 DEFAULT_GENERATE_CONFIG_PATH = PROJECT_ROOT / "config" / "generate.yaml"
@@ -35,6 +36,10 @@ def add_generation_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--top-k", dest="top_k", type=int, default=None)
     parser.add_argument("--repetition-penalty", dest="repetition_penalty", type=float, default=None)
     parser.add_argument("--num-beams", dest="num_beams", type=int, default=None)
+    parser.add_argument("--stop-sequences", dest="stop_sequences", type=str, default=None)
+    parser.add_argument("--use-chat-template", dest="use_chat_template", type=str2bool, default=None)
+    parser.add_argument("--prompt-debug", dest="prompt_debug_enabled", action="store_true", default=None)
+    parser.add_argument("--prompt-debug-output-dir", dest="prompt_debug_output_dir", type=str, default=None)
 
 
 def build_batch_parser() -> argparse.ArgumentParser:
@@ -77,6 +82,25 @@ def normalize_generation_fields(runtime: dict[str, Any]) -> None:
     runtime["top_k"] = int(runtime["top_k"])
     runtime["repetition_penalty"] = float(runtime["repetition_penalty"])
     runtime["num_beams"] = int(runtime["num_beams"])
+    runtime["stop_sequences"] = normalize_stop_sequences(runtime.get("stop_sequences"))
+    runtime["use_chat_template"] = str2bool(runtime.get("use_chat_template", True))
+
+
+def normalize_stop_sequences(value) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [item for item in value.split(",") if item]
+    return [str(item) for item in value if str(item)]
+
+
+def apply_prompt_debug_overrides(runtime: dict[str, Any], args: argparse.Namespace) -> None:
+    prompt_debug = normalize_prompt_debug_config(runtime.get("prompt_debug"))
+    if getattr(args, "prompt_debug_enabled", None) is not None:
+        prompt_debug["enabled"] = bool(args.prompt_debug_enabled)
+    if getattr(args, "prompt_debug_output_dir", None):
+        prompt_debug["output_dir"] = str(resolve_path(args.prompt_debug_output_dir))
+    runtime["prompt_debug"] = normalize_prompt_debug_config(prompt_debug)
 
 
 def apply_cli_overrides(runtime: dict[str, Any], args: argparse.Namespace, excluded: set[str]) -> None:
@@ -102,9 +126,16 @@ def build_batch_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
         "batch_size": raw_config.get("batch_size"),
         "print_prompts": raw_config.get("print_prompts", True),
         "quantization_mode": raw_config.get("quantization_mode", "8bit"),
+        "use_chat_template": raw_config.get("use_chat_template", True),
+        "prompt_debug": raw_config.get("prompt_debug") or {},
+        "stop_sequences": generation_cfg.get("stop_sequences", []),
         **{key: generation_cfg.get(key) for key in GENERATION_KEYS},
     }
-    apply_cli_overrides(runtime, args, {"config", "dry_run"})
+    apply_cli_overrides(
+        runtime,
+        args,
+        {"config", "dry_run", "prompt_debug_enabled", "prompt_debug_output_dir"},
+    )
 
     require_keys(
         runtime,
@@ -130,6 +161,7 @@ def build_batch_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
     runtime["print_prompts"] = str2bool(runtime["print_prompts"])
     runtime["quantization_mode"] = str(runtime.get("quantization_mode") or "8bit")
     normalize_generation_fields(runtime)
+    apply_prompt_debug_overrides(runtime, args)
     return runtime
 
 
@@ -148,9 +180,16 @@ def build_webui_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
         "server_port": raw_config.get("server_port"),
         "share": raw_config.get("share"),
         "quantization_mode": raw_config.get("quantization_mode", "8bit"),
+        "use_chat_template": raw_config.get("use_chat_template", True),
+        "prompt_debug": raw_config.get("prompt_debug") or {},
+        "stop_sequences": generation_cfg.get("stop_sequences", []),
         **{key: generation_cfg.get(key) for key in GENERATION_KEYS},
     }
-    apply_cli_overrides(runtime, args, {"config", "dry_run"})
+    apply_cli_overrides(
+        runtime,
+        args,
+        {"config", "dry_run", "prompt_debug_enabled", "prompt_debug_output_dir"},
+    )
 
     require_keys(
         runtime,
@@ -177,6 +216,7 @@ def build_webui_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
     runtime["server_port"] = int(runtime["server_port"])
     runtime["quantization_mode"] = str(runtime.get("quantization_mode") or "8bit")
     normalize_generation_fields(runtime)
+    apply_prompt_debug_overrides(runtime, args)
     return runtime
 
 
@@ -196,4 +236,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

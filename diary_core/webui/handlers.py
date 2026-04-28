@@ -6,7 +6,7 @@ from pathlib import Path
 
 from diary_core.config.common import dump_runtime_config
 from diary_core.config.infer_config import build_webui_parser, build_webui_runtime_config
-from diary_core.infer.generation import extract_ai_reply, generate_batch
+from diary_core.infer.diary_runtime import DiaryRuntime
 from diary_core.model.loader import load_model_and_tokenizer
 from diary_core.webui.state import WebUIState
 
@@ -48,15 +48,6 @@ def unload_model_handler(state: WebUIState) -> str:
     return "模型已卸载"
 
 
-def build_full_prompt(history: list[str], user_prompt: str, system: str = "", role: str = "") -> str:
-    pieces: list[str] = []
-    if system:
-        pieces.append(f"[系统]: {system.strip()}")
-    pieces.extend(history)
-    pieces.append(f"{role}: {user_prompt}")
-    return "\n".join(pieces) + "\nAI:"
-
-
 def append_conversation_log(state: WebUIState, role: str, prompt: str, reply: str) -> None:
     output_dir = Path(state.app_config["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -71,10 +62,15 @@ def generate_handler(state: WebUIState, prompt: str, save_md_checkbox, system: s
     if not state.is_loaded:
         return "请先加载模型"
 
-    full_prompt = build_full_prompt(state.conversation_history, prompt, system=system, role=role)
     runtime = {**state.app_config, **state.generation_params}
-    text = generate_batch([full_prompt], state.tokenizer, state.model, runtime)[0]
-    reply = extract_ai_reply(text)
+    diary_runtime = DiaryRuntime(runtime, state.tokenizer, state.model)
+    result = diary_runtime.generate(
+        prompt,
+        conversation_history=state.conversation_history,
+        system=system,
+        role=role,
+    )
+    reply = result.final_text
 
     state.conversation_history.append(f"{role}: {prompt}")
     state.conversation_history.append(f"AI: {reply}")
@@ -129,8 +125,7 @@ def main() -> None:
             "output_dir": "webui/diary_outputs",
         }
     )
-    prompt = build_full_prompt(state.conversation_history, "测试", system="系统", role="用户")
-    print(prompt)
+    print(json.dumps({"handler": "ready", "history_items": len(state.conversation_history)}, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

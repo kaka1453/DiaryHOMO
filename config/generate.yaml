@@ -5,6 +5,14 @@ output_file: generate/output/test1.md
 device: cuda
 batch_size: 1
 print_prompts: true
+use_chat_template: true
+
+prompt_debug:
+  enabled: false
+  output_dir: debug/prompt
+  include_rendered_prompt: true
+  include_messages: true
+  include_model_output: true
 
 generation:
   max_new_tokens: 256
@@ -13,3 +21,8 @@ generation:
   top_k: 60
   repetition_penalty: 6.0
   num_beams: 1
+  stop_sequences:
+    - "\n---"
+    - "\n## "
+    - "\n# "
+    - "<!--"

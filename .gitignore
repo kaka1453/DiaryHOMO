@@ -23,3 +23,5 @@ generate/input_prompt/*
 
 generate/output/*
 !generate/output/.gitkeep
+
+debug/*
