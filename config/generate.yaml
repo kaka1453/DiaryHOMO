@@ -1,7 +1,7 @@
 model_name_or_path: data/large_language_model/Qwen/Qwen2.5-14B-Instruct
 checkpoint_dir: checkpoint/old_ckpt/qwen14b_boa_256/step_12000
 input_file: generate/input_prompt/inputtest.txt
-output_root: output
+output_root: generate/output
 output_name: boa256日记
 device: cuda
 batch_size: 4

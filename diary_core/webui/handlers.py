@@ -127,9 +127,9 @@ def main() -> None:
             "top_k": 60,
             "repetition_penalty": 1.2,
             "num_beams": 1,
-            "output_root": "output",
+            "output_root": "generate/output",
             "output_name": "boa256日记",
-            "output_run_dir": "output/boa256日记/dev",
+            "output_run_dir": "generate/output/boa256日记/dev",
         }
     )
     print(json.dumps({"handler": "ready", "history_items": len(state.conversation_history)}, ensure_ascii=False, indent=2))

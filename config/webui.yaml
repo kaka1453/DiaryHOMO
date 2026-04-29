@@ -1,7 +1,7 @@
 model_name_or_path: data/large_language_model/Qwen/Qwen2.5-14B-Instruct
 checkpoint_dir: checkpoint/old_ckpt/qwen14b_boa_256/step_12000
 device: cuda
-output_root: output
+output_root: generate/output
 output_name: boa256日记
 save_md: true
 server_name: 0.0.0.0
