@@ -16,6 +16,36 @@ prompt_debug:
   include_messages: true
   include_model_output: true
 
+generation_profiles:
+  enabled: true
+  humor:
+    temperature: 0.78
+    top_p: 0.9
+    top_k: 50
+    repetition_penalty: 1.05
+    max_new_tokens: 160
+    stop_sequences:
+      - "（这里可以"
+      - "这里可以加"
+      - "（以上为背景介绍"
+      - "以上为背景介绍"
+      - "今日总结"
+      - "\n\n今日总结"
+      - "\n\n总的来说"
+  short:
+    temperature: 0.62
+    top_p: 0.82
+    top_k: 40
+    repetition_penalty: 1.1
+    max_new_tokens: 90
+    stop_sequences:
+      - "\n\n接下来的日子"
+      - "接下来的日子"
+      - "也许生活"
+      - "今天的日记到这里"
+      - "迎接明天"
+      - "生活中的小确幸"
+
 generation:
   max_new_tokens: 320
   temperature: 0.65

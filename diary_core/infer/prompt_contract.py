@@ -23,6 +23,13 @@ STYLE_KEYWORDS = [
     "反转",
     "意外结尾",
     "调侃",
+    "反差",
+    "场景化",
+    "荒诞",
+    "难蚌",
+    "蚌",
+    "寄",
+    "破防",
     "打工人式",
     "夸张",
     "戏剧化",
@@ -40,6 +47,35 @@ STYLE_KEYWORDS = [
     "随意",
     "聊天一样",
     "自黑",
+]
+
+HUMOR_CUE_WORDS = [
+    "假装",
+    "躲避",
+    "脾气火爆",
+    "分手厨房",
+    "自杀式",
+    "恋爱脑",
+    "难蚌",
+    "蚌",
+    "寄",
+    "破防",
+    "副本级",
+    "当场去世",
+    "邪恶",
+    "白嫖",
+    "抢票脚本",
+    "屁股垫",
+    "检讨危机",
+    "被迫围观",
+    "疯狂折腾",
+    "太怂",
+    "离谱",
+    "红烧肉",
+    "葱油饼",
+    "醋香",
+    "远征",
+    "洗钱工具",
 ]
 
 DRIFT_TOPIC_GROUPS = {
@@ -160,6 +196,26 @@ DOMAIN_TOPIC_KEYWORDS = [
     "日常",
     "朋友",
     "吃饭",
+    "书房",
+    "假装刻苦工作",
+    "躲妹妹",
+    "脾气火爆",
+    "分手厨房",
+    "自杀式",
+    "妹妹",
+    "红烧肉",
+    "葱油饼",
+    "醋香",
+    "被迫围观",
+    "抱枕",
+    "双面抱枕",
+    "电梯",
+    "屁股垫",
+    "检讨危机",
+    "抢票脚本",
+    "当场去世",
+    "破防",
+    "副本级待遇",
 ]
 
 STOPWORDS = {
@@ -449,6 +505,8 @@ def _extract_style_hints(prompt: str, match_info: dict | None = None) -> list[st
     for keyword in STYLE_KEYWORDS:
         if keyword.lower() in prompt.lower():
             hints.append(keyword)
+    if _has_humor_cue(prompt):
+        hints.extend(["搞笑", "吐槽", "反差", "场景化"])
     return _unique_preserve_order(
         [_clean_term(item) for item in hints if _is_valid_style_hint(_clean_term(item))]
     )
@@ -460,6 +518,7 @@ def _extract_topic_terms(prompt: str, main_topic: str) -> list[str]:
         return _unique_preserve_order(_split_terms(KEYWORD_ALIASES[compact_prompt]))[:12]
 
     candidates = []
+    candidates.extend(_extract_short_anchor_terms(prompt))
     candidates.extend(_split_terms(main_topic))
     candidates.extend(_extract_quoted_terms(prompt))
     source = f"{prompt} {main_topic}"
@@ -488,6 +547,52 @@ def _extract_quoted_terms(prompt: str) -> list[str]:
     for match in re.finditer(r"[“\"「『](.+?)[”\"」』]", prompt):
         terms.extend(_split_terms(match.group(1)))
     return terms
+
+
+def _extract_short_anchor_terms(prompt: str) -> list[str]:
+    anchors = []
+    if "书房" in prompt:
+        anchors.append("书房")
+    fake_work = re.search(r"假装[^，。！？,.；;]{1,10}", prompt)
+    if fake_work:
+        anchors.append(fake_work.group(0))
+    if re.search(r"躲避[^，。！？,.；;]{0,16}妹妹", prompt):
+        anchors.append("躲妹妹")
+    if "妹妹" in prompt:
+        anchors.append("妹妹")
+    if "脾气火爆" in prompt:
+        anchors.append("脾气火爆")
+    if "分手厨房" in prompt:
+        anchors.append("分手厨房")
+    if "自杀式" in prompt:
+        anchors.append("自杀式")
+
+    cue_to_anchor = {
+        "被迫围观": "被迫围观",
+        "红烧肉": "红烧肉",
+        "葱油饼": "葱油饼",
+        "醋香": "醋香",
+        "抢票脚本": "抢票脚本",
+        "疯狂折腾": "疯狂折腾",
+        "屁股垫": "屁股垫",
+        "难蚌": "难蚌",
+        "检讨危机": "检讨危机",
+        "当场去世": "当场去世",
+        "破防": "破防",
+        "副本级": "副本级待遇",
+        "太怂": "太怂",
+        "离谱": "离谱",
+        "白嫖": "白嫖",
+        "邪恶": "邪恶",
+    }
+    for cue, anchor in cue_to_anchor.items():
+        if cue in prompt:
+            anchors.append(anchor)
+
+    for term in ["山东", "宿舍", "周瑜", "kaka", "LWZ", "SQ", "德川", "纯平", "双面抱枕", "抱枕", "电梯", "女生", "五角场", "密室", "NPC", "恋爱脑"]:
+        if term in prompt:
+            anchors.append(term)
+    return _unique_preserve_order(anchors)
 
 
 def _build_forbidden_drift_topics(prompt: str, topic_terms: list[str], groups: dict[str, list[str]]) -> list[str]:
@@ -530,7 +635,13 @@ def _infer_risk_tags(prompt: str, prompt_type: str, topic_terms: list[str]) -> l
         tags.append("fictional_setup")
     if any(term.lower() in {"cat", "kaka", "sq", "nus"} for term in topic_terms):
         tags.append("named_keyword")
+    if _has_humor_cue(prompt) or any(term in {"搞笑", "幽默", "吐槽", "夸张", "戏剧化", "反差", "段子", "难蚌", "破防"} for term in topic_terms):
+        tags.append("humor_or_absurd_prompt")
     return _unique_preserve_order(tags)
+
+
+def _has_humor_cue(prompt: str) -> bool:
+    return any(cue.lower() in prompt.lower() for cue in HUMOR_CUE_WORDS)
 
 
 def _looks_like_keyword(prompt: str) -> bool:

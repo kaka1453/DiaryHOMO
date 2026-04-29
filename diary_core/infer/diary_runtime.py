@@ -13,6 +13,10 @@ from diary_core.infer.prompt_contract import DiaryContract, analyze_prompt, buil
 from diary_core.infer.prompt_debug import PromptDebugRun, normalize_prompt_debug_config
 
 
+HUMOR_PROFILE_STYLE_HINTS = {"搞笑", "幽默", "吐槽", "夸张", "戏剧化", "反差", "段子", "难蚌", "破防", "场景化"}
+GENERATION_PROFILE_KEYS = {"temperature", "top_p", "top_k", "repetition_penalty", "max_new_tokens"}
+
+
 @dataclass
 class DiaryResult:
     raw_prompt: str
@@ -50,6 +54,7 @@ class DiaryRuntime:
 
         contract = build_contract(raw_prompt, intent=intent, config=runtime.get("prompt_contract"))
         debug.write_json("02_contract.json", contract.to_dict())
+        runtime = self.apply_generation_profile(runtime, contract)
 
         attachments = self.collect_attachments(contract, context)
         debug.write_json("03_attachments.json", attachments)
@@ -136,8 +141,61 @@ class DiaryRuntime:
             "do_sample": True,
             "stop_sequences": runtime.get("stop_sequences", []),
             "use_chat_template": runtime.get("use_chat_template", True),
+            "generation_profile": runtime.get("_generation_profile", {"enabled": False, "name": None}),
         }
         return request
+
+    def apply_generation_profile(self, runtime: dict, contract: DiaryContract) -> dict:
+        runtime = dict(runtime)
+        profile_config = runtime.get("generation_profiles") or {}
+        if not _as_bool(profile_config.get("enabled", False)):
+            runtime["_generation_profile"] = {"enabled": False, "name": None, "reason": "generation_profiles disabled"}
+            return runtime
+
+        style_hints = set(getattr(contract, "style_hints", []))
+        risk_tags = set(getattr(contract, "risk_tags", []))
+        if "short_input_expansion_risk" in risk_tags:
+            short_profile = {
+                "temperature": 0.62,
+                "top_p": 0.82,
+                "top_k": 40,
+                "repetition_penalty": 1.1,
+                "max_new_tokens": 120,
+            }
+            short_profile.update(profile_config.get("short") or {})
+            overrides = _apply_profile_overrides(runtime, short_profile)
+            runtime["_generation_profile"] = {
+                "enabled": True,
+                "name": "short",
+                "reason": "short_input_expansion_risk matched",
+                "matched_style_hints": sorted(style_hints & HUMOR_PROFILE_STYLE_HINTS),
+                "matched_risk_tags": sorted(risk_tags & {"short_input_expansion_risk"}),
+                "overrides": overrides,
+            }
+            return runtime
+
+        if "humor_or_absurd_prompt" not in risk_tags and not (style_hints & HUMOR_PROFILE_STYLE_HINTS):
+            runtime["_generation_profile"] = {"enabled": True, "name": "default", "reason": "no style profile matched"}
+            return runtime
+
+        humor_profile = {
+            "temperature": 0.78,
+            "top_p": 0.9,
+            "top_k": 50,
+            "repetition_penalty": 1.05,
+            "max_new_tokens": 180,
+        }
+        humor_profile.update(profile_config.get("humor") or {})
+        overrides = _apply_profile_overrides(runtime, humor_profile)
+        runtime["_generation_profile"] = {
+            "enabled": True,
+            "name": "humor",
+            "reason": "humor_or_absurd_prompt/style_hints matched",
+            "matched_style_hints": sorted(style_hints & HUMOR_PROFILE_STYLE_HINTS),
+            "matched_risk_tags": sorted(risk_tags & {"humor_or_absurd_prompt"}),
+            "overrides": overrides,
+        }
+        return runtime
 
     def generate_rendered_prompt(self, rendered_prompt: str, runtime: dict) -> str:
         inputs = self.tokenizer(
@@ -157,11 +215,14 @@ class DiaryRuntime:
 
     def postprocess(self, text: str, runtime: dict) -> tuple[str, dict]:
         trimmed = trim_stop_sequences(text, runtime.get("stop_sequences", []))
-        final = trimmed.strip()
+        tail_trimmed = _trim_incomplete_tail(trimmed.strip())
+        final = tail_trimmed.strip()
         return final, {
             "raw_length": len(text),
+            "after_stop_length": len(trimmed.strip()),
             "final_length": len(final),
             "stop_sequences": runtime.get("stop_sequences", []),
+            "tail_trimmed": final != trimmed.strip(),
             "changed": final != text.strip(),
         }
 
@@ -197,6 +258,47 @@ def generate_diary(raw_prompt: str, runtime_config: dict | None = None, tokenize
         raise ValueError("generate_diary 第一版需要显式传入 tokenizer 和 model。")
     runtime = DiaryRuntime(runtime_config or {}, tokenizer, model)
     return runtime.generate(raw_prompt)
+
+
+def _apply_profile_overrides(runtime: dict, profile: dict) -> dict:
+    overrides = {key: profile[key] for key in GENERATION_PROFILE_KEYS if key in profile}
+    if "max_new_tokens" in overrides:
+        overrides["max_new_tokens"] = min(
+            int(runtime.get("max_new_tokens", overrides["max_new_tokens"])),
+            int(overrides["max_new_tokens"]),
+        )
+    runtime.update(overrides)
+
+    stop_sequences = list(profile.get("stop_sequences") or [])
+    if stop_sequences:
+        merged = list(runtime.get("stop_sequences") or [])
+        for sequence in stop_sequences:
+            if sequence not in merged:
+                merged.append(sequence)
+        runtime["stop_sequences"] = merged
+        overrides["stop_sequences_added"] = stop_sequences
+    return overrides
+
+
+def _trim_incomplete_tail(text: str) -> str:
+    if not text:
+        return text
+    stripped = text.rstrip()
+    if stripped.endswith(("。", "！", "？", "～", "~", "”", "」", "』")):
+        return stripped
+    last_positions = [stripped.rfind(mark) for mark in ("。", "！", "？", "～", "~")]
+    last_pos = max(last_positions)
+    if last_pos >= max(20, int(len(stripped) * 0.55)):
+        return stripped[: last_pos + 1]
+    return stripped
+
+
+def _as_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
 class _FakeBatch(dict):
