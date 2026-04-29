@@ -1,7 +1,8 @@
 model_name_or_path: data/large_language_model/Qwen/Qwen2.5-14B-Instruct
 checkpoint_dir: checkpoint/old_ckpt/qwen14b_boa_256/step_12000
 input_file: generate/input_prompt/inputtest.txt
-output_file: generate/output/test1.md
+output_root: output
+output_name: boa256日记
 device: cuda
 batch_size: 4
 print_prompts: true
@@ -15,14 +16,17 @@ prompt_debug:
   include_model_output: true
 
 generation:
-  max_new_tokens: 256
-  temperature: 0.9
-  top_p: 0.9
-  top_k: 60
-  repetition_penalty: 1.5
+  max_new_tokens: 220
+  temperature: 0.65
+  top_p: 0.85
+  top_k: 40
+  repetition_penalty: 1.08
   num_beams: 1
   stop_sequences:
     - "\n---"
     - "\n## "
     - "\n# "
+    - "\n#"
+    - "\n### "
+    - "```"
     - "<!--"

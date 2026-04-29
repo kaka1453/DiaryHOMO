@@ -7,11 +7,12 @@ from pathlib import Path
 from diary_core.config.common import dump_runtime_config
 from diary_core.config.infer_config import build_webui_parser, build_webui_runtime_config
 from diary_core.infer.diary_runtime import DiaryRuntime
+from diary_core.infer.output_bundle import OUTPUT_MD_FILENAME, prepare_output_bundle, write_parameters
 from diary_core.model.loader import load_model_and_tokenizer
 from diary_core.webui.state import WebUIState
 
 
-CONVERSATION_LOG_FILENAME = "conversation.md"
+CONVERSATION_LOG_FILENAME = OUTPUT_MD_FILENAME
 
 
 def load_model_handler(
@@ -37,6 +38,8 @@ def load_model_handler(
         }
     )
     runtime = {**state.app_config, **state.generation_params}
+    state.app_config.update(prepare_output_bundle(runtime))
+    write_parameters(runtime)
     state.tokenizer, state.model = load_model_and_tokenizer(runtime)
     return "模型加载完成"
 
@@ -49,7 +52,7 @@ def unload_model_handler(state: WebUIState) -> str:
 
 
 def append_conversation_log(state: WebUIState, role: str, prompt: str, reply: str) -> None:
-    output_dir = Path(state.app_config["output_dir"])
+    output_dir = Path(state.app_config["output_run_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
     md_path = output_dir / CONVERSATION_LOG_FILENAME
     with md_path.open("a", encoding="utf-8") as fh:
@@ -96,6 +99,8 @@ def main() -> None:
 
     if args.real_test:
         runtime = build_webui_runtime_config(_build_runtime_args(args))
+        prepare_output_bundle(runtime)
+        write_parameters(runtime)
         state = WebUIState(runtime)
         print(dump_runtime_config(runtime))
         print(
@@ -122,7 +127,9 @@ def main() -> None:
             "top_k": 60,
             "repetition_penalty": 1.2,
             "num_beams": 1,
-            "output_dir": "webui/diary_outputs",
+            "output_root": "output",
+            "output_name": "boa256日记",
+            "output_run_dir": "output/boa256日记/dev",
         }
     )
     print(json.dumps({"handler": "ready", "history_items": len(state.conversation_history)}, ensure_ascii=False, indent=2))

@@ -7,6 +7,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from diary_core.config.common import dump_runtime_config
 from diary_core.config.infer_config import build_webui_parser, build_webui_runtime_config
+from diary_core.infer.output_bundle import prepare_output_bundle, write_parameters
 from diary_core.webui.app import build_demo
 from diary_core.webui.state import WebUIState
 
@@ -21,7 +22,10 @@ def main():
         print(dump_runtime_config(app_config))
         return
 
-    Path(app_config["output_dir"]).mkdir(parents=True, exist_ok=True)
+    prepare_output_bundle(app_config)
+    write_parameters(app_config)
+    Path(app_config["output_run_dir"]).mkdir(parents=True, exist_ok=True)
+    print(f"WebUI 输出目录: {app_config['output_run_dir']}")
     demo = build_demo(WebUIState(app_config))
     demo.launch(
         server_name=app_config["server_name"],

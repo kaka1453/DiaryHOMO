@@ -7,12 +7,15 @@ import torch
 from diary_core.config.common import dump_runtime_config
 from diary_core.config.infer_config import build_batch_parser, build_batch_runtime_config
 from diary_core.infer.diary_runtime import DiaryRuntime
+from diary_core.infer.output_bundle import prepare_output_bundle, write_parameters
 from diary_core.infer.prompt_io import format_markdown_block, load_prompts, write_results
 from diary_core.model.loader import load_model_and_tokenizer
 
 
 def run_generation(runtime: dict) -> None:
     torch.backends.cuda.matmul.allow_tf32 = True
+    prepare_output_bundle(runtime)
+    write_parameters(runtime)
 
     prompts = load_prompts(runtime["input_file"])
     if runtime["print_prompts"]:
@@ -34,7 +37,7 @@ def run_generation(runtime: dict) -> None:
             results.append(block)
 
     write_results(results, runtime["output_file"])
-    print(f"\n8bit 推理完成，共 {len(results)} 篇，已写入 {runtime['output_file']}")
+    print(f"\n8bit 推理完成，共 {len(results)} 篇，输出目录: {runtime['output_run_dir']}")
 
 
 def main() -> None:

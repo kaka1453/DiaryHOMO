@@ -49,6 +49,8 @@ def build_batch_parser() -> argparse.ArgumentParser:
     parser.add_argument("--checkpoint-dir", dest="checkpoint_dir", type=str, default=None)
     parser.add_argument("--input-file", dest="input_file", type=str, default=None)
     parser.add_argument("--output-file", dest="output_file", type=str, default=None)
+    parser.add_argument("--output-root", dest="output_root", type=str, default=None)
+    parser.add_argument("--output-name", dest="output_name", type=str, default=None)
     parser.add_argument("--device", dest="device", type=str, default=None)
     parser.add_argument("--batch-size", dest="batch_size", type=int, default=None)
     parser.add_argument("--dry-run", dest="dry_run", action="store_true")
@@ -65,6 +67,8 @@ def build_webui_parser() -> argparse.ArgumentParser:
     parser.add_argument("--checkpoint-dir", dest="checkpoint_dir", type=str, default=None)
     parser.add_argument("--device", dest="device", type=str, default=None)
     parser.add_argument("--output-dir", dest="output_dir", type=str, default=None)
+    parser.add_argument("--output-root", dest="output_root", type=str, default=None)
+    parser.add_argument("--output-name", dest="output_name", type=str, default=None)
     parser.add_argument("--save-md", dest="save_md", type=str2bool, default=None)
     parser.add_argument("--server-name", dest="server_name", type=str, default=None)
     parser.add_argument("--server-port", dest="server_port", type=int, default=None)
@@ -122,6 +126,8 @@ def build_batch_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
         "checkpoint_dir": raw_config.get("checkpoint_dir"),
         "input_file": raw_config.get("input_file"),
         "output_file": raw_config.get("output_file"),
+        "output_root": raw_config.get("output_root", "output"),
+        "output_name": raw_config.get("output_name", "boa256日记"),
         "device": raw_config.get("device"),
         "batch_size": raw_config.get("batch_size"),
         "print_prompts": raw_config.get("print_prompts", True),
@@ -143,7 +149,6 @@ def build_batch_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
             "model_name_or_path",
             "checkpoint_dir",
             "input_file",
-            "output_file",
             "device",
             "batch_size",
             "print_prompts",
@@ -156,7 +161,11 @@ def build_batch_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
     runtime["model_name_or_path"] = str(resolve_path(runtime["model_name_or_path"]))
     runtime["checkpoint_dir"] = str(resolve_path(runtime["checkpoint_dir"]))
     runtime["input_file"] = str(resolve_path(runtime["input_file"]))
-    runtime["output_file"] = str(resolve_path(runtime["output_file"]))
+    if runtime.get("output_file"):
+        runtime["legacy_output_file"] = str(resolve_path(runtime["output_file"]))
+    runtime.pop("output_file", None)
+    runtime["output_root"] = str(resolve_path(runtime.get("output_root") or "output"))
+    runtime["output_name"] = str(runtime.get("output_name") or "boa256日记")
     runtime["batch_size"] = int(runtime["batch_size"])
     runtime["print_prompts"] = str2bool(runtime["print_prompts"])
     runtime["quantization_mode"] = str(runtime.get("quantization_mode") or "8bit")
@@ -175,6 +184,8 @@ def build_webui_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
         "checkpoint_dir": raw_config.get("checkpoint_dir"),
         "device": raw_config.get("device"),
         "output_dir": raw_config.get("output_dir"),
+        "output_root": raw_config.get("output_root", raw_config.get("output_dir") or "output"),
+        "output_name": raw_config.get("output_name", "boa256日记"),
         "save_md": raw_config.get("save_md"),
         "server_name": raw_config.get("server_name"),
         "server_port": raw_config.get("server_port"),
@@ -197,7 +208,6 @@ def build_webui_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
             "model_name_or_path",
             "checkpoint_dir",
             "device",
-            "output_dir",
             "save_md",
             "server_name",
             "server_port",
@@ -210,7 +220,11 @@ def build_webui_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
     runtime["config_path"] = config_path
     runtime["model_name_or_path"] = str(resolve_path(runtime["model_name_or_path"]))
     runtime["checkpoint_dir"] = str(resolve_path(runtime["checkpoint_dir"]))
-    runtime["output_dir"] = str(resolve_path(runtime["output_dir"]))
+    if runtime.get("output_dir"):
+        runtime["legacy_output_dir"] = str(resolve_path(runtime["output_dir"]))
+    runtime.pop("output_dir", None)
+    runtime["output_root"] = str(resolve_path(runtime.get("output_root") or "output"))
+    runtime["output_name"] = str(runtime.get("output_name") or "boa256日记")
     runtime["save_md"] = str2bool(runtime["save_md"])
     runtime["share"] = str2bool(runtime["share"])
     runtime["server_port"] = int(runtime["server_port"])
