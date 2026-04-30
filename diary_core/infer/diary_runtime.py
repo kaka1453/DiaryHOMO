@@ -8,6 +8,7 @@ from typing import Any
 import torch
 
 from diary_core.infer.generation import generation_kwargs, trim_stop_sequences
+from diary_core.infer.guard import GuardResult, guard_diary, normalize_guard_config
 from diary_core.infer.prompt_builder import build_messages, render_prompt
 from diary_core.infer.prompt_contract import DiaryContract, analyze_prompt, build_contract
 from diary_core.infer.prompt_debug import PromptDebugRun, normalize_prompt_debug_config
@@ -90,7 +91,80 @@ class DiaryRuntime:
         final_text, postprocess = self.postprocess(raw_model_output, runtime)
         debug.write_json("08_postprocess.json", postprocess)
 
-        guard = self.guard(contract, final_text, runtime)
+        guard_result = self.guard(contract, final_text, runtime)
+        attempts = [
+            self.build_attempt_record(
+                attempt=1,
+                final_text=final_text,
+                raw_model_output=raw_model_output,
+                rendered_prompt=rendered_prompt,
+                generation_request=generation_request,
+                postprocess=postprocess,
+                guard_result=guard_result,
+            )
+        ]
+        debug.write_json("09_guard_attempt_1.json", guard_result.to_dict())
+
+        guard_config = normalize_guard_config(runtime.get("guard"))
+        previous_text = final_text
+        previous_guard = guard_result
+        for retry_index in range(1, guard_config["max_retry"] + 1):
+            if not self.should_retry(previous_guard, guard_config):
+                break
+
+            retry_messages = self.build_retry_messages(contract, previous_text, previous_guard)
+            debug.write_json(
+                f"09_retry_{retry_index}_messages.json",
+                retry_messages,
+                enabled=runtime["prompt_debug"]["include_messages"],
+            )
+            retry_rendered_prompt = render_prompt(
+                self.tokenizer,
+                retry_messages,
+                use_chat_template=runtime.get("use_chat_template", True),
+            )
+            debug.write_text(
+                f"09_retry_{retry_index}_rendered_prompt.txt",
+                retry_rendered_prompt,
+                enabled=runtime["prompt_debug"]["include_rendered_prompt"],
+            )
+            retry_generation_request = self.build_generation_request(runtime)
+            debug.write_json(f"09_retry_{retry_index}_generation_request.json", retry_generation_request)
+
+            retry_raw_model_output = self.generate_rendered_prompt(retry_rendered_prompt, runtime)
+            debug.write_text(
+                f"09_retry_{retry_index}_raw_model_output.txt",
+                retry_raw_model_output,
+                enabled=runtime["prompt_debug"]["include_model_output"],
+            )
+            retry_final_text, retry_postprocess = self.postprocess(retry_raw_model_output, runtime)
+            debug.write_json(f"09_retry_{retry_index}_postprocess.json", retry_postprocess)
+
+            retry_guard = self.guard(contract, retry_final_text, runtime)
+            debug.write_json(f"09_guard_attempt_{retry_index + 1}.json", retry_guard.to_dict())
+            attempts.append(
+                self.build_attempt_record(
+                    attempt=retry_index + 1,
+                    final_text=retry_final_text,
+                    raw_model_output=retry_raw_model_output,
+                    rendered_prompt=retry_rendered_prompt,
+                    generation_request=retry_generation_request,
+                    postprocess=retry_postprocess,
+                    guard_result=retry_guard,
+                )
+            )
+            previous_text = retry_final_text
+            previous_guard = retry_guard
+            if retry_guard.decision == "pass":
+                break
+
+        selected_attempt = self.select_attempt(attempts, guard_config)
+        final_text = selected_attempt["final_text"]
+        raw_model_output = selected_attempt["raw_model_output"]
+        rendered_prompt = selected_attempt["rendered_prompt"]
+        generation_request = selected_attempt["generation_request"]
+        postprocess = selected_attempt["postprocess"]
+        guard = self.build_guard_summary(attempts, selected_attempt, guard_config)
         debug.write_json("09_guard.json", guard)
         debug.write_text("10_final_output.txt", final_text)
         debug.log("prompt_debug run completed")
@@ -226,12 +300,100 @@ class DiaryRuntime:
             "changed": final != text.strip(),
         }
 
-    def guard(self, contract: DiaryContract, final_text: str, runtime: dict) -> dict:
+    def guard(self, contract: DiaryContract, final_text: str, runtime: dict) -> GuardResult:
+        return guard_diary(final_text, contract, runtime.get("guard"))
+
+    def should_retry(self, guard_result: GuardResult, guard_config: dict) -> bool:
+        if not guard_result.enabled or guard_config["max_retry"] <= 0:
+            return False
+        if guard_result.decision == "pass":
+            return False
+        if guard_result.decision == "revise":
+            return guard_config["retry_on_revise"]
+        return True
+
+    def build_retry_messages(self, contract: DiaryContract, previous_draft: str, guard_result: GuardResult) -> list[dict]:
+        guard_data = guard_result.to_dict()
+        user_content = "\n".join(
+            [
+                "[ORIGINAL_CONTRACT]",
+                f"MAIN_TOPIC: {contract.main_topic}",
+                f"TOPIC_TERMS: {_format_inline_list(contract.topic_terms)}",
+                f"FORBIDDEN_DRIFT_TOPICS: {_format_inline_list(contract.forbidden_drift_topics)}",
+                "",
+                "[PREVIOUS_DRAFT]",
+                previous_draft.strip(),
+                "",
+                "[GUARD_FAILURE]",
+                "失败原因：",
+                _format_bullets(guard_data.get("reasons") or []),
+                f"命中禁区词：{_format_forbidden_hits(guard_data.get('forbidden_hits') or [])}",
+                f"缺失主题词：{_format_inline_list(guard_data.get('missing_topic_terms') or [])}",
+                f"格式问题：{_format_inline_list(guard_data.get('format_hits') or [])}",
+                f"语言噪声：{_format_inline_list(guard_data.get('language_noise_hits') or [])}",
+                "",
+                "[REWRITE_TASK]",
+                "请重写为一篇新的日记正文。",
+                "必须围绕 MAIN_TOPIC 和 TOPIC_TERMS。",
+                "删除所有禁区内容、格式漂移和语言噪声。",
+                "不要解释，不要列点，不要输出标题，不要 Markdown。",
+            ]
+        )
+        return [
+            {
+                "role": "system",
+                "content": "你是一个私人日记重写助手。只输出修订后的单篇日记正文，不做安全审核，不解释。",
+            },
+            {"role": "user", "content": user_content},
+        ]
+
+    def build_attempt_record(
+        self,
+        *,
+        attempt: int,
+        final_text: str,
+        raw_model_output: str,
+        rendered_prompt: str,
+        generation_request: dict,
+        postprocess: dict,
+        guard_result: GuardResult,
+    ) -> dict:
         return {
-            "enabled": False,
-            "status": "skipped",
-            "decision": "pass",
-            "reason": "DiaryGuard 尚未实现；当前仅保留 prompt_debug 占位结构。",
+            "attempt": attempt,
+            "final_text": final_text,
+            "final_text_preview": final_text[:240],
+            "raw_model_output": raw_model_output,
+            "rendered_prompt": rendered_prompt,
+            "generation_request": generation_request,
+            "postprocess": postprocess,
+            "guard": guard_result.to_dict(),
+        }
+
+    def select_attempt(self, attempts: list[dict], guard_config: dict) -> dict:
+        for attempt in attempts:
+            if attempt["guard"]["decision"] == "pass":
+                return attempt
+        if guard_config.get("fail_strategy") == "best_attempt":
+            return max(attempts, key=lambda item: item["guard"].get("final_score", 0))
+        return attempts[-1]
+
+    def build_guard_summary(self, attempts: list[dict], selected_attempt: dict, guard_config: dict) -> dict:
+        selected_guard = selected_attempt["guard"]
+        return {
+            "enabled": selected_guard.get("enabled", False),
+            "decision": selected_guard.get("decision", "pass"),
+            "selected_attempt": selected_attempt["attempt"],
+            "retry_count": max(0, len(attempts) - 1),
+            "config": guard_config,
+            "attempts": [
+                {
+                    "attempt": attempt["attempt"],
+                    "guard": attempt["guard"],
+                    "postprocess": attempt["postprocess"],
+                    "final_text_preview": attempt["final_text_preview"],
+                }
+                for attempt in attempts
+            ],
         }
 
     def _build_call_runtime(self, kwargs: dict) -> tuple[dict, dict]:
@@ -250,6 +412,7 @@ class DiaryRuntime:
         runtime["prompt_debug"] = normalize_prompt_debug_config(prompt_debug_config)
         runtime.setdefault("stop_sequences", [])
         runtime.setdefault("use_chat_template", True)
+        runtime.setdefault("guard", {})
         return runtime, context
 
 
@@ -258,6 +421,25 @@ def generate_diary(raw_prompt: str, runtime_config: dict | None = None, tokenize
         raise ValueError("generate_diary 第一版需要显式传入 tokenizer 和 model。")
     runtime = DiaryRuntime(runtime_config or {}, tokenizer, model)
     return runtime.generate(raw_prompt)
+
+
+def _format_inline_list(items: list[str]) -> str:
+    return "、".join(str(item) for item in items if str(item)) or "无"
+
+
+def _format_bullets(items: list[str]) -> str:
+    if not items:
+        return "- 无"
+    return "\n".join(f"- {item}" for item in items)
+
+
+def _format_forbidden_hits(hits: list[dict]) -> str:
+    if not hits:
+        return "无"
+    chunks = []
+    for hit in hits[:12]:
+        chunks.append(f"{hit.get('term')}({hit.get('severity')}x{hit.get('count')})")
+    return "、".join(chunks)
 
 
 def _apply_profile_overrides(runtime: dict, profile: dict) -> dict:

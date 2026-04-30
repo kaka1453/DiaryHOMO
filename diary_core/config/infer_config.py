@@ -137,6 +137,7 @@ def build_batch_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
         "use_chat_template": raw_config.get("use_chat_template", True),
         "prompt_debug": raw_config.get("prompt_debug") or {},
         "generation_profiles": raw_config.get("generation_profiles") or {},
+        "guard": raw_config.get("guard") or {},
         "stop_sequences": generation_cfg.get("stop_sequences", []),
         **{key: generation_cfg.get(key) for key in GENERATION_KEYS},
     }
@@ -197,6 +198,7 @@ def build_webui_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
         "use_chat_template": raw_config.get("use_chat_template", True),
         "prompt_debug": raw_config.get("prompt_debug") or {},
         "generation_profiles": raw_config.get("generation_profiles") or {},
+        "guard": raw_config.get("guard") or {},
         "stop_sequences": generation_cfg.get("stop_sequences", []),
         **{key: generation_cfg.get(key) for key in GENERATION_KEYS},
     }
