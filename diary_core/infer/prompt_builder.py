@@ -281,6 +281,18 @@ def _scene_beats(contract: DiaryContract) -> list[str]:
     prompt = contract.raw_prompt.strip()
     terms = [term for term in getattr(contract, "topic_terms", []) if term]
     if getattr(contract, "length_hint", "") == "short":
+        if _contains_compact(prompt, "cat"):
+            return [
+                "开场：把 cat 当成作者日记里的邪恶表妹/孽缘人物词，不要写成猫。",
+                "发展：只写一个当下印象、小互动或脑内吐槽，不扩写成学校、考试、股票或技术旧流水账。",
+                "收尾：用一句难蚌或自嘲收住，短一点也可以。",
+            ]
+        if _contains_compact(prompt, "这不很快就要"):
+            return [
+                "开场：保留“这不很快就要”的悬置感，写我突然想到时间逼近但又说不清具体是什么。",
+                "发展：只写当下卡壳、翻手机、看时间、脑子冒泡这类模糊小动作；不要接成考试、复习、图书馆、课程或旧人物日程。",
+                "收尾：用一句“算了，先把这句放这儿”的碎碎念结束，短一点也可以。",
+            ]
         if _contains_compact(prompt, "朋友") and _contains_compact(prompt, "吃饭"):
             return [
                 "开场：我和朋友坐下来吃饭，直接写饭桌现场。",

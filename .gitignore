@@ -25,3 +25,5 @@ generate/output/*
 !generate/output/.gitkeep
 
 debug/*
+
+config/diary_profile.yaml

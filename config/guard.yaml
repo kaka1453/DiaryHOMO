@@ -1,0 +1,195 @@
+# DiaryGuard 配置
+# 作用：
+# - 被 diary_core/config/infer_config.py 读取，并传给 diary_core/infer/guard.py。
+# - 控制 DiaryGuard 的主题守卫、旧记忆漂移词、格式检查、语言噪声与质量警告。
+# - 这里不做内容安全审核，只做“是否守题、是否跑到旧主题、格式/语言是否崩、质量是否空泛”。
+# - 如果某些词是当前 prompt 明确授权的主题，guard.py 会动态解禁，不应误杀。
+
+enabled: true
+max_retry: 1
+retry_on_revise: true
+retry_on_warnings: false
+pass_with_warnings: true
+fail_strategy: best_attempt
+
+thresholds:
+  min_final_score: 75
+  min_topic_score: 55
+  min_drift_score: 85
+  min_format_score: 85
+  min_language_score: 75
+  min_quality_score: 60
+
+extra_forbidden_terms:
+  # 旧记忆/旧日记残留词。只在本次 prompt 未授权时作为漂移信号。
+  - yyj
+  - b计算机
+  - 冰激凌
+  - 浩海钓具
+  - 钓鱼用品店
+  - 反向伞
+  - 大明瑾
+  - 圣地
+  - 分校区
+  - 旧人物档案
+  - 过去的聊天
+  - 聊天记录
+  - 顾问
+  - 虚无妹妹
+  - b政治
+  - 数学课
+  - 高中作业
+  - 晚自习
+  - 课程预习
+
+severity:
+  high:
+    - 股票
+    - 期权
+    - 算法
+    - 代码
+    - 考试
+    - NUS
+    - 实验室
+    - 旧聊天记录
+    - 链接
+    - Markdown 表格
+    - 日语假名
+    - 英文长串
+    - 外部链接
+    - http
+    - https
+    - YouTube
+    - youtube
+    - B站
+    - GitHub
+    - 虚无妹妹
+    - b政治
+  medium:
+    - 作业
+    - 复习
+    - 课程
+    - AirPods
+    - Genshin
+    - 雅思
+    - CET6
+    - 高数
+    - 线性代数
+    - yyj
+    - b计算机
+    - 冰激凌
+    - 钓鱼用品店
+    - 浩海钓具
+    - 反向伞
+
+term_aliases:
+  宿舍: [寝室]
+  被迫围观: [围观, 吸引出来, 出来看]
+  和朋友吃饭: [朋友们一起吃, 朋友们聚餐, 和朋友们一起吃]
+  朋友: [朋友们]
+  考研: [备考, 上岸]
+  复习: [刷题, 做题, 学习]
+  调侃: [吐槽, 难蚌]
+  反抗: [对抗]
+  黑纸运动: [黑纸]
+  起义: [抗议, 行动]
+  cat: [邪恶表妹, 表妹]
+  邪恶表妹: [cat, 表妹]
+
+quality:
+  enabled: true
+  min_quality_score: 60
+  min_length_by_type:
+    keyword: 40
+    short_daily: 50
+    question: 50
+    opening: 90
+    instruction: 120
+    style_instruction: 120
+    simulation_instruction: 120
+  max_prompt_copy_ratio: 0.45
+  generic_template_penalty: true
+  repetition_penalty_enabled: true
+  require_scene_for_humor: true
+
+  generic_template_terms:
+    - 总的来说
+    - 这种体验让我
+    - 这让我意识到
+    - 这是一种
+    - 也许这就是生活
+    - 成为了共同的记忆
+    - 我会继续努力
+    - 明天会更好
+    - 就记录到这里
+    - 今天的日记到这里
+    - 每个人都有自己的生活
+    - 这是值得我学习的
+    - 生活中的小确幸
+    - 迎接明天
+    - 按部就班
+
+  old_memory_risk_terms:
+    # cat/cat弟妹 是作者人物词；这里仅用于短 prompt 的旧经历扩写风险提示，不作为硬禁区。
+    - cat弟妹
+    - 弟妹
+    - 武汉
+    - 双休日
+    - 小时候
+    - 以前
+    - 过去
+    - 回家
+    - 家里人
+    - 同学
+    - 学校
+    - 图书馆
+    - 实验室
+    - 数学课
+    - 作业
+    - 复习
+    - b政治
+    - 虚无妹妹
+
+  scene_terms:
+    - 看到
+    - 听到
+    - 走
+    - 坐
+    - 拿
+    - 打开
+    - 关上
+    - 回到
+    - 桌
+    - 床
+    - 门
+    - 宿舍
+    - 寝室
+    - 图书馆
+    - 餐厅
+    - 书房
+    - 笑
+    - 问
+    - 说
+    - 递
+    - 看着
+    - 闻到
+
+  humor_scene_terms:
+    - 吐槽
+    - OS
+    - 脑子
+    - 难蚌
+    - 蚌
+    - 寄
+    - 草
+    - 笑
+    - 离谱
+    - 破防
+    - 当场
+    - 邪恶
+    - 恼
+
+audit:
+  include_guard_table: true
+  include_warnings: true
+  mode: html_comment

@@ -49,13 +49,19 @@ generation_profiles:
 guard:
   enabled: true
   max_retry: 1
-  min_final_score: 75
-  min_topic_score: 55
-  min_drift_score: 85
-  min_format_score: 85
-  min_language_score: 75
   retry_on_revise: true
+  retry_on_warnings: false
+  pass_with_warnings: true
   fail_strategy: best_attempt
+  thresholds:
+    min_final_score: 75
+    min_topic_score: 55
+    min_drift_score: 85
+    min_format_score: 85
+    min_language_score: 75
+    min_quality_score: 60
+  quality:
+    enabled: true
 
 generation:
   max_new_tokens: 320
@@ -72,3 +78,7 @@ generation:
     - "\n### "
     - "```"
     - "<!--"
+
+audit:
+  include_guard_table: true
+  include_warnings: true

@@ -8,6 +8,7 @@ from diary_core.config.common import dump_runtime_config
 from diary_core.config.infer_config import build_webui_parser, build_webui_runtime_config
 from diary_core.infer.diary_runtime import DiaryRuntime
 from diary_core.infer.output_bundle import OUTPUT_MD_FILENAME, prepare_output_bundle, write_parameters
+from diary_core.infer.prompt_io import format_guard_audit
 from diary_core.model.loader import load_model_and_tokenizer
 from diary_core.webui.state import WebUIState
 
@@ -51,14 +52,22 @@ def unload_model_handler(state: WebUIState) -> str:
     return "模型已卸载"
 
 
-def append_conversation_log(state: WebUIState, role: str, prompt: str, reply: str) -> None:
+def append_conversation_log(
+    state: WebUIState,
+    role: str,
+    prompt: str,
+    reply: str,
+    guard: dict | None = None,
+    debug_dir: str | None = None,
+) -> None:
     output_dir = Path(state.app_config["output_run_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
     md_path = output_dir / CONVERSATION_LOG_FILENAME
+    audit = format_guard_audit(guard, debug_dir=debug_dir, audit_config=state.app_config.get("audit"))
     with md_path.open("a", encoding="utf-8") as fh:
         fh.write(f"## {len(state.conversation_history) // 2}\n")
         fh.write(f"{role}: {prompt}\n")
-        fh.write(f"AI: {reply}\n\n---\n")
+        fh.write(f"AI: {reply}{audit}\n\n---\n")
 
 
 def generate_handler(state: WebUIState, prompt: str, save_md_checkbox, system: str = "", role: str = "") -> str:
@@ -79,7 +88,7 @@ def generate_handler(state: WebUIState, prompt: str, save_md_checkbox, system: s
     state.conversation_history.append(f"AI: {reply}")
 
     if save_md_checkbox:
-        append_conversation_log(state, role, prompt, reply)
+        append_conversation_log(state, role, prompt, reply, guard=result.guard, debug_dir=result.debug_dir)
 
     return reply
 

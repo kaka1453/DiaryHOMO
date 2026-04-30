@@ -149,7 +149,7 @@ SHORT_DAILY_PROMPTS = {
 }
 
 KEYWORD_ALIASES = {
-    "cat": "cat/猫",
+    "cat": "cat/邪恶表妹/孽缘纠纷",
     "nus": "NUS",
     "kaka": "kaka",
     "sq": "SQ",
@@ -612,6 +612,8 @@ def _group_is_authorized(prompt_terms: str, terms: list[str]) -> bool:
 def _infer_length_hint(prompt: str, prompt_type: str) -> str:
     if prompt_type in {"keyword", "short_daily", "question"}:
         return "short"
+    if prompt_type == "opening" and len(prompt.strip()) <= SHORT_PROMPT_MAX_CHARS:
+        return "short"
     if prompt_type == "opening":
         return "medium"
     if len(prompt) > 60:
@@ -621,8 +623,10 @@ def _infer_length_hint(prompt: str, prompt_type: str) -> str:
 
 def _infer_risk_tags(prompt: str, prompt_type: str, topic_terms: list[str]) -> list[str]:
     tags = []
-    if prompt_type in {"keyword", "short_daily"}:
+    if prompt_type in {"keyword", "short_daily"} or (prompt_type == "opening" and len(prompt.strip()) <= SHORT_PROMPT_MAX_CHARS):
         tags.append("short_input_expansion_risk")
+    if prompt_type == "opening" and len(prompt.strip()) <= SHORT_PROMPT_MAX_CHARS:
+        tags.append("fragment_opening_expansion_risk")
     if re.search(r"[A-Za-z]{2,}", prompt):
         tags.append("multilingual_trigger")
     if any(_contains_term(prompt, term) for term in ["色情", "恋爱"]):

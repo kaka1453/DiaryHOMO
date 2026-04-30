@@ -157,6 +157,8 @@ class DiaryRuntime:
             previous_guard = retry_guard
             if retry_guard.decision == "pass":
                 break
+            if retry_guard.decision == "pass_with_warnings" and not guard_config.get("retry_on_warnings"):
+                break
 
         selected_attempt = self.select_attempt(attempts, guard_config)
         final_text = selected_attempt["final_text"]
@@ -308,6 +310,8 @@ class DiaryRuntime:
             return False
         if guard_result.decision == "pass":
             return False
+        if guard_result.decision == "pass_with_warnings":
+            return bool(guard_config.get("retry_on_warnings", False))
         if guard_result.decision == "revise":
             return guard_config["retry_on_revise"]
         return True
@@ -331,12 +335,20 @@ class DiaryRuntime:
                 f"缺失主题词：{_format_inline_list(guard_data.get('missing_topic_terms') or [])}",
                 f"格式问题：{_format_inline_list(guard_data.get('format_hits') or [])}",
                 f"语言噪声：{_format_inline_list(guard_data.get('language_noise_hits') or [])}",
+                f"质量警告：{_format_inline_list(guard_data.get('warnings') or guard_data.get('quality_warnings') or [])}",
                 "",
                 "[REWRITE_TASK]",
                 "请重写为一篇新的日记正文。",
                 "必须围绕 MAIN_TOPIC 和 TOPIC_TERMS。",
                 "删除所有禁区内容、格式漂移和语言噪声。",
                 "不要解释，不要列点，不要输出标题，不要 Markdown。",
+                "",
+                "[REWRITE_STYLE_REQUIREMENT]",
+                "重写时不要只复述 MAIN_TOPIC；请保留主旨，同时在主旨范围内补充 1-2 个具体动作、内心吐槽或小对话。",
+                "允许的合理展开：现场动作、内心 OS、一句对话、轻微夸张比喻、与主题直接相关的小后果。",
+                "不允许的展开：跳到股票/算法/考试/旧聊天/旧人物长故事/未授权地点，或从当前 prompt 扩成完全无关的历史回忆。",
+                "如果原 prompt 有搞笑、难蚌、离谱、吐槽感，重写后必须保留笑点锐度；不要升华成大道理，不要写成总结报告。",
+                "对缺失主题词要自然补回，不能只写泛泛的自由、努力、生活感受。",
             ]
         )
         return [
@@ -373,13 +385,16 @@ class DiaryRuntime:
         for attempt in attempts:
             if attempt["guard"]["decision"] == "pass":
                 return attempt
+        for attempt in attempts:
+            if attempt["guard"]["decision"] == "pass_with_warnings":
+                return attempt
         if guard_config.get("fail_strategy") == "best_attempt":
             return max(attempts, key=lambda item: item["guard"].get("final_score", 0))
         return attempts[-1]
 
     def build_guard_summary(self, attempts: list[dict], selected_attempt: dict, guard_config: dict) -> dict:
         selected_guard = selected_attempt["guard"]
-        return {
+        summary = {
             "enabled": selected_guard.get("enabled", False),
             "decision": selected_guard.get("decision", "pass"),
             "selected_attempt": selected_attempt["attempt"],
@@ -395,6 +410,19 @@ class DiaryRuntime:
                 for attempt in attempts
             ],
         }
+        for key in [
+            "final_score",
+            "topic_score",
+            "drift_score",
+            "format_score",
+            "language_score",
+            "quality_score",
+            "warnings",
+            "quality_warnings",
+            "reasons",
+        ]:
+            summary[key] = selected_guard.get(key)
+        return summary
 
     def _build_call_runtime(self, kwargs: dict) -> tuple[dict, dict]:
         runtime = dict(self.runtime_config)

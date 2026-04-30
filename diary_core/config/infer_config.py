@@ -17,6 +17,7 @@ from diary_core.infer.prompt_debug import normalize_prompt_debug_config
 
 DEFAULT_GENERATE_CONFIG_PATH = PROJECT_ROOT / "config" / "generate.yaml"
 DEFAULT_WEBUI_CONFIG_PATH = PROJECT_ROOT / "config" / "webui.yaml"
+DEFAULT_GUARD_CONFIG_PATH = PROJECT_ROOT / "config" / "guard.yaml"
 DEFAULT_OUTPUT_ROOT = "generate/output"
 DEFAULT_OUTPUT_NAME = "boa256日记"
 
@@ -100,6 +101,28 @@ def normalize_stop_sequences(value) -> list[str]:
     return [str(item) for item in value if str(item)]
 
 
+def deep_merge_dict(base: dict[str, Any], overrides: dict[str, Any] | None) -> dict[str, Any]:
+    merged = dict(base)
+    if not isinstance(overrides, dict):
+        return merged
+    for key, value in overrides.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = deep_merge_dict(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def load_guard_runtime_config(raw_config: dict[str, Any]) -> dict[str, Any]:
+    base = load_yaml_config(DEFAULT_GUARD_CONFIG_PATH, "config/guard.yaml")
+    return deep_merge_dict(base, raw_config.get("guard") or {})
+
+
+def load_audit_runtime_config(raw_config: dict[str, Any], guard_config: dict[str, Any]) -> dict[str, Any]:
+    base = guard_config.get("audit") if isinstance(guard_config.get("audit"), dict) else {}
+    return deep_merge_dict(base, raw_config.get("audit") or {})
+
+
 def apply_prompt_debug_overrides(runtime: dict[str, Any], args: argparse.Namespace) -> None:
     prompt_debug = normalize_prompt_debug_config(runtime.get("prompt_debug"))
     if getattr(args, "prompt_debug_enabled", None) is not None:
@@ -122,6 +145,7 @@ def build_batch_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
     config_path = Path(args.config).expanduser().resolve()
     raw_config = load_yaml_config(config_path, "config/generate.yaml")
     generation_cfg = raw_config.get("generation") or {}
+    guard_config = load_guard_runtime_config(raw_config)
 
     runtime = {
         "model_name_or_path": raw_config.get("model_name_or_path"),
@@ -137,7 +161,8 @@ def build_batch_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
         "use_chat_template": raw_config.get("use_chat_template", True),
         "prompt_debug": raw_config.get("prompt_debug") or {},
         "generation_profiles": raw_config.get("generation_profiles") or {},
-        "guard": raw_config.get("guard") or {},
+        "guard": guard_config,
+        "audit": load_audit_runtime_config(raw_config, guard_config),
         "stop_sequences": generation_cfg.get("stop_sequences", []),
         **{key: generation_cfg.get(key) for key in GENERATION_KEYS},
     }
@@ -182,6 +207,7 @@ def build_webui_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
     config_path = Path(args.config).expanduser().resolve()
     raw_config = load_yaml_config(config_path, "config/webui.yaml")
     generation_cfg = raw_config.get("generation") or {}
+    guard_config = load_guard_runtime_config(raw_config)
 
     runtime = {
         "model_name_or_path": raw_config.get("model_name_or_path"),
@@ -198,7 +224,8 @@ def build_webui_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
         "use_chat_template": raw_config.get("use_chat_template", True),
         "prompt_debug": raw_config.get("prompt_debug") or {},
         "generation_profiles": raw_config.get("generation_profiles") or {},
-        "guard": raw_config.get("guard") or {},
+        "guard": guard_config,
+        "audit": load_audit_runtime_config(raw_config, guard_config),
         "stop_sequences": generation_cfg.get("stop_sequences", []),
         **{key: generation_cfg.get(key) for key in GENERATION_KEYS},
     }

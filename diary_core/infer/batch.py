@@ -31,7 +31,14 @@ def run_generation(runtime: dict) -> None:
 
         for prompt in batch:
             result = diary_runtime.generate(prompt)
-            block = format_markdown_block(len(results) + 1, prompt, result.final_text)
+            block = format_markdown_block(
+                len(results) + 1,
+                prompt,
+                result.final_text,
+                guard=result.guard,
+                debug_dir=result.debug_dir,
+                audit_config=runtime.get("audit"),
+            )
             if runtime["print_prompts"]:
                 print(block)
             results.append(block)
