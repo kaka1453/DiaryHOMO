@@ -6,6 +6,13 @@ from pathlib import Path
 
 from diary_core.config.common import dump_runtime_config
 from diary_core.config.infer_config import build_webui_parser, build_webui_runtime_config
+from diary_core.infer.audit import (
+    AUDIT_JSONL_FILENAME,
+    append_audit_record,
+    build_audit_record,
+    read_jsonl,
+    refresh_audit_artifacts_from_jsonl,
+)
 from diary_core.infer.diary_runtime import DiaryRuntime
 from diary_core.infer.output_bundle import OUTPUT_MD_FILENAME, prepare_output_bundle, write_parameters
 from diary_core.infer.prompt_io import format_guard_audit
@@ -74,6 +81,10 @@ def generate_handler(state: WebUIState, prompt: str, save_md_checkbox, system: s
     if not state.is_loaded:
         return "请先加载模型"
 
+    if not state.app_config.get("output_run_dir"):
+        state.app_config.update(prepare_output_bundle(state.app_config))
+        write_parameters(state.app_config)
+
     runtime = {**state.app_config, **state.generation_params}
     diary_runtime = DiaryRuntime(runtime, state.tokenizer, state.model)
     result = diary_runtime.generate(
@@ -86,6 +97,16 @@ def generate_handler(state: WebUIState, prompt: str, save_md_checkbox, system: s
 
     state.conversation_history.append(f"{role}: {prompt}")
     state.conversation_history.append(f"AI: {reply}")
+
+    audit_path = Path(state.app_config["output_run_dir"]) / AUDIT_JSONL_FILENAME
+    audit_index = len(read_jsonl(audit_path)) + 1 if audit_path.exists() else 1
+    audit_record = build_audit_record(
+        index=audit_index,
+        result=result,
+        audit_config=state.app_config.get("audit"),
+    )
+    append_audit_record(state.app_config["output_run_dir"], audit_record, state.app_config.get("audit"))
+    refresh_audit_artifacts_from_jsonl(state.app_config["output_run_dir"], state.app_config.get("audit"))
 
     if save_md_checkbox:
         append_conversation_log(state, role, prompt, reply, guard=result.guard, debug_dir=result.debug_dir)

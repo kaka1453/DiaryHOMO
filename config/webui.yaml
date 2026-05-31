@@ -80,5 +80,15 @@ generation:
     - "<!--"
 
 audit:
+  enabled: true
+  write_jsonl: true
+  write_summary: true
+  write_table: true
+  include_contract: true
+  include_guard: true
+  include_debug_dir: true
+  include_generation_request: true
+  include_postprocess: true
+  include_final_text: true
   include_guard_table: true
   include_warnings: true

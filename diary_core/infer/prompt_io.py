@@ -31,6 +31,8 @@ def format_guard_audit(
     audit_config: dict | None = None,
 ) -> str:
     audit_config = audit_config or {}
+    if audit_config.get("enabled") is False:
+        return ""
     if not guard or not audit_config.get("include_guard_table", False):
         return ""
     selected = _selected_guard(guard)

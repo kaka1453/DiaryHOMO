@@ -24,6 +24,9 @@ generate/input_prompt/*
 generate/output/*
 !generate/output/.gitkeep
 
+generate/validation/*
+!generate/validation/.gitkeep
+
 debug/*
 
 config/diary_profile.yaml
