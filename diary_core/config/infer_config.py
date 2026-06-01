@@ -18,6 +18,7 @@ from diary_core.infer.prompt_debug import normalize_prompt_debug_config
 DEFAULT_GENERATE_CONFIG_PATH = PROJECT_ROOT / "config" / "generate.yaml"
 DEFAULT_WEBUI_CONFIG_PATH = PROJECT_ROOT / "config" / "webui.yaml"
 DEFAULT_GUARD_CONFIG_PATH = PROJECT_ROOT / "config" / "guard.yaml"
+DEFAULT_DIARY_PROFILE_CONFIG_PATH = PROJECT_ROOT / "config" / "diary_profile.yaml"
 DEFAULT_OUTPUT_ROOT = "generate/output"
 DEFAULT_OUTPUT_NAME = "boa256日记"
 
@@ -123,6 +124,24 @@ def load_audit_runtime_config(raw_config: dict[str, Any], guard_config: dict[str
     return deep_merge_dict(base, raw_config.get("audit") or {})
 
 
+def load_diary_profile_runtime_config(raw_config: dict[str, Any]) -> dict[str, Any]:
+    config = deep_merge_dict(
+        {
+            "enabled": True,
+            "profile_path": str(DEFAULT_DIARY_PROFILE_CONFIG_PATH),
+        },
+        raw_config.get("diary_profile") or {},
+    )
+    config["enabled"] = str2bool(config.get("enabled", True))
+    profile_path = resolve_path(config.get("profile_path") or DEFAULT_DIARY_PROFILE_CONFIG_PATH)
+    config["profile_path"] = str(profile_path)
+    if config["enabled"]:
+        config["profile"] = load_yaml_config(profile_path, "config/diary_profile.yaml")
+    else:
+        config["profile"] = {}
+    return config
+
+
 def apply_prompt_debug_overrides(runtime: dict[str, Any], args: argparse.Namespace) -> None:
     prompt_debug = normalize_prompt_debug_config(runtime.get("prompt_debug"))
     if getattr(args, "prompt_debug_enabled", None) is not None:
@@ -161,6 +180,7 @@ def build_batch_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
         "use_chat_template": raw_config.get("use_chat_template", True),
         "prompt_debug": raw_config.get("prompt_debug") or {},
         "generation_profiles": raw_config.get("generation_profiles") or {},
+        "diary_profile": load_diary_profile_runtime_config(raw_config),
         "guard": guard_config,
         "audit": load_audit_runtime_config(raw_config, guard_config),
         "stop_sequences": generation_cfg.get("stop_sequences", []),
@@ -224,6 +244,7 @@ def build_webui_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
         "use_chat_template": raw_config.get("use_chat_template", True),
         "prompt_debug": raw_config.get("prompt_debug") or {},
         "generation_profiles": raw_config.get("generation_profiles") or {},
+        "diary_profile": load_diary_profile_runtime_config(raw_config),
         "guard": guard_config,
         "audit": load_audit_runtime_config(raw_config, guard_config),
         "stop_sequences": generation_cfg.get("stop_sequences", []),

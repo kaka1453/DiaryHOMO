@@ -16,6 +16,10 @@ prompt_debug:
   include_messages: true
   include_model_output: true
 
+diary_profile:
+  enabled: true
+  profile_path: config/diary_profile.yaml
+
 generation_profiles:
   enabled: true
   humor:

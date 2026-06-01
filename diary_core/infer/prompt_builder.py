@@ -50,63 +50,66 @@ def build_messages(contract: DiaryContract, attachments: dict | None = None, con
     config = config or {}
     attachments = attachments or {}
     system_prompt = config.get("system_prompt") or DEFAULT_SYSTEM_PROMPT
-    user_content = "\n".join(
+    user_parts = [
+        "[RAW_PROMPT]",
+        contract.raw_prompt.strip(),
+        "",
+        "[MAIN_TOPIC]",
+        contract.main_topic,
+        "",
+        "[TOPIC_TERMS]",
+        _format_list(getattr(contract, "topic_terms", [])),
+        "",
+        "[MUST_INCLUDE_TERMS]",
+        _format_list(_must_include_terms(contract)),
+        "",
+        "[SCENE_BEATS]",
+        _format_list(_scene_beats(contract)),
+        "",
+        "[CURRENT_TOPIC_LOCK]",
+        contract.topic_lock,
+        "",
+        "[ALLOWED_FACTS]",
+        _format_list(contract.allowed_facts),
+        "",
+        "[STYLE_HINTS]",
+        _format_list(contract.style_hints),
+        "",
+        "[FORBIDDEN_DRIFT_TOPICS]",
+        _format_list(select_prompt_forbidden_topics(contract)),
+        "",
+        "[FORMAT_FORBIDDEN]",
+        _format_list(getattr(contract, "format_forbidden", [])),
+        "",
+        "[STYLE_EXECUTION]",
+        _style_execution_rule(contract),
+        "",
+        "[ANTI_GENERIC_RULE]",
+        _anti_generic_rule(contract),
+        "",
+        "[SELF_CHECK_BEFORE_OUTPUT]",
+        _self_check_rule(contract),
+        "",
+        "[DRIFT_AVOIDANCE_RULE]",
+        _drift_avoidance_rule(contract),
+        "",
+        "[OLD_MEMORY_BAN]",
+        _old_memory_ban_rule(contract),
+        "",
+        "[FACT_BOUNDARY_HINT]",
+        _fact_boundary_hint(contract),
+        "",
+    ]
+    attachment_blocks = format_attachment_blocks(attachments)
+    if attachment_blocks:
+        user_parts.extend(["[PROFILE_AND_CONTEXT_ATTACHMENTS]", attachment_blocks, ""])
+    user_parts.extend(
         [
-            "[RAW_PROMPT]",
-            contract.raw_prompt.strip(),
-            "",
-            "[MAIN_TOPIC]",
-            contract.main_topic,
-            "",
-            "[TOPIC_TERMS]",
-            _format_list(getattr(contract, "topic_terms", [])),
-            "",
-            "[MUST_INCLUDE_TERMS]",
-            _format_list(_must_include_terms(contract)),
-            "",
-            "[SCENE_BEATS]",
-            _format_list(_scene_beats(contract)),
-            "",
-            "[CURRENT_TOPIC_LOCK]",
-            contract.topic_lock,
-            "",
-            "[ALLOWED_FACTS]",
-            _format_list(contract.allowed_facts),
-            "",
-            "[STYLE_HINTS]",
-            _format_list(contract.style_hints),
-            "",
-            "[FORBIDDEN_DRIFT_TOPICS]",
-            _format_list(select_prompt_forbidden_topics(contract)),
-            "",
-            "[FORMAT_FORBIDDEN]",
-            _format_list(getattr(contract, "format_forbidden", [])),
-            "",
-            "[STYLE_EXECUTION]",
-            _style_execution_rule(contract),
-            "",
-            "[ANTI_GENERIC_RULE]",
-            _anti_generic_rule(contract),
-            "",
-            "[SELF_CHECK_BEFORE_OUTPUT]",
-            _self_check_rule(contract),
-            "",
-            "[DRIFT_AVOIDANCE_RULE]",
-            _drift_avoidance_rule(contract),
-            "",
-            "[OLD_MEMORY_BAN]",
-            _old_memory_ban_rule(contract),
-            "",
-            "[FACT_BOUNDARY_HINT]",
-            _fact_boundary_hint(contract),
-            "",
-            "[ATTACHMENTS]",
-            _format_attachments(attachments),
-            "",
             "[OUTPUT]",
             "只输出单篇连续日记正文。不要输出标题、解释、列表、分点、表格、代码块、标签或链接。",
         ]
     )
+    user_content = "\n".join(user_parts)
     return [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_content},
@@ -132,13 +135,35 @@ def _format_list(items: list[str]) -> str:
     return "\n".join(f"- {item}" for item in items)
 
 
-def _format_attachments(attachments: dict) -> str:
+def format_attachment_blocks(attachments: dict) -> str:
     if not attachments or not attachments.get("items"):
-        return "- 无附件。本轮不要引入额外事实。"
-    lines = []
+        return ""
+    profile_lines = []
+    context_lines = []
     for item in attachments["items"]:
-        lines.append(f"- {item}")
-    return "\n".join(lines)
+        if item.get("type") == "diary_profile":
+            title = item.get("title") or item.get("section") or "PROFILE_ATTACHMENT"
+            render_text = str(item.get("render_text") or "").strip()
+            if render_text:
+                profile_lines.append(f"[{title}]\n{render_text}")
+            continue
+        item_type = item.get("type", "context")
+        content = item.get("content")
+        if isinstance(content, list):
+            content_text = "；".join(str(value) for value in content[-6:])
+        else:
+            content_text = str(content or "").strip()
+        if content_text:
+            context_lines.append(f"- {item_type}: {content_text}")
+    blocks = []
+    blocks.extend(profile_lines)
+    if context_lines:
+        blocks.append("[CONTEXT_ATTACHMENTS]\n" + "\n".join(context_lines))
+    return "\n\n".join(blocks)
+
+
+def _format_attachments(attachments: dict) -> str:
+    return format_attachment_blocks(attachments)
 
 
 def select_prompt_forbidden_topics(contract: DiaryContract, max_items: int = 24) -> list[str]:
@@ -194,7 +219,11 @@ def select_prompt_forbidden_topics(contract: DiaryContract, max_items: int = 24)
 
 def _fact_boundary_hint(contract: DiaryContract) -> str:
     fact_types = getattr(contract, "forbidden_fact_types", [])
-    weak_hint = "缺少细节时，优先写感受和模糊日常，不要为了丰富内容迁移旧日记事件。"
+    weak_hint = (
+        "缺少细节时，可以做主旨内的小想象：模糊场景、普通动作、感官细节、脑内 OS、轻微夸张比喻、泛称人物。"
+        "不要为了丰富内容迁移旧日记事件，也不要编未授权硬事实。"
+        "禁止主动添加具体姓名、餐厅名、学校建筑名、精确金额、硬日期、考试科目、股票代码或旧人物长故事。"
+    )
     if not fact_types:
         return weak_hint
     return f"{weak_hint} 弱提醒：不要主动添加{_join_inline(fact_types[:4])}等未授权具体事实。"
@@ -209,16 +238,18 @@ def _style_execution_rule(contract: DiaryContract) -> str:
             [
                 "本篇按“作者风味搞笑日记”写，不要写成普通道理反思。",
                 "正文写 2-3 个自然段即可；第一段进入 SCENE_BEATS 第1步，第二段写尴尬/反差，第3段用内心 OS 或自嘲收住。",
+                "至少保留 RAW_PROMPT 里的一个核心梗词，并围绕它做一个反差笑点；不要把梗词改写成“某件事/这种情况”。",
                 "保留 RAW_PROMPT 中最有梗的词和物件，比如难蚌、寄、破防、白嫖、邪恶、屁股垫、分手厨房、被迫围观等，不要改成抽象概念。",
                 "用具体动作、现场画面、对话感、内心弹幕和反差比喻制造笑点；至少写一句“我当时脑子里的吐槽/OS”。",
+                "每段换一种展开方式：画面、动作、对话感、OS、比喻，不要连续复读 MAIN_TOPIC。",
                 "允许出现少量作者口癖：蚌、难蚌、寄、邪恶、离谱、属实，但不要为了口癖脱离本次事件。",
                 "可以轻微夸张，像真实碎碎念一样吐槽，但每个笑点都要回到 TOPIC_TERMS。",
                 "结尾用一个小落点或自嘲收住，例如“属实难蚌”“今日评价：寄但有节目效果”，不要升华成大道理。",
             ]
         )
     if getattr(contract, "length_hint", "") == "short":
-        return "短 prompt 要短写，只围绕输入本身写当下感受和一点碎碎念，不编旧经历。"
-    return "普通日常要写自然、具体、有一点碎碎念；多写现场动作和内心 OS，不要写成总结报告。"
+        return "短 prompt 要短写，只围绕输入本身写当下感受；至少给一个具体动作或感官细节，再给一句内心 OS，不编旧经历。"
+    return "普通日常要写自然、具体、有一点碎碎念；多写现场动作、感官细节和内心 OS，每段换一种展开方式，不要写成总结报告。"
 
 
 def _anti_generic_rule(contract: DiaryContract) -> str:
@@ -260,7 +291,12 @@ def _self_check_rule(contract: DiaryContract) -> str:
 
 def _old_memory_ban_rule(contract: DiaryContract) -> str:
     topic_text = _compact(" ".join([contract.raw_prompt, contract.main_topic, " ".join(getattr(contract, "topic_terms", []))]))
-    forbidden = [term for term in OLD_MEMORY_FORBIDDEN_TERMS if not _contains_compact(topic_text, term)]
+    authorized_terms = _authorized_old_memory_aliases(topic_text)
+    forbidden = [
+        term
+        for term in OLD_MEMORY_FORBIDDEN_TERMS
+        if term not in authorized_terms and not _contains_compact(topic_text, term)
+    ]
     if not forbidden:
         return "本题已授权相关词时可使用；其余仍不得扩写成旧日记时间线。"
     return (
@@ -268,6 +304,13 @@ def _old_memory_ban_rule(contract: DiaryContract) -> str:
         f"{_join_inline(forbidden[:20])}。"
         "如果缺细节，宁可围绕 RAW_PROMPT 写短一点，也不要借旧流水账补字数。"
     )
+
+
+def _authorized_old_memory_aliases(topic_text: str) -> set[str]:
+    authorized = set()
+    if _contains_compact(topic_text, "树冠") or _contains_compact(topic_text, "圣地"):
+        authorized.add("图书馆")
+    return authorized
 
 
 def _must_include_terms(contract: DiaryContract) -> list[str]:
@@ -283,8 +326,8 @@ def _scene_beats(contract: DiaryContract) -> list[str]:
     if getattr(contract, "length_hint", "") == "short":
         if _contains_compact(prompt, "cat"):
             return [
-                "开场：把 cat 当成作者日记里的邪恶表妹/孽缘人物词，不要写成猫。",
-                "发展：只写一个当下印象、小互动或脑内吐槽，不扩写成学校、考试、股票或技术旧流水账。",
+                "开场：cat 是作者日记里的邪恶表妹/孽缘人物词，正文不要写成猫、猫咪、路边猫或宠物。",
+                "发展：只写一个和 cat 相关的当下动作、小互动、表情或脑内吐槽；可以写“我手都停了一下”这种模糊小画面，不扩写成学校、考试、股票或技术旧流水账。",
                 "收尾：用一句难蚌或自嘲收住，短一点也可以。",
             ]
         if _contains_compact(prompt, "这不很快就要"):
@@ -296,13 +339,13 @@ def _scene_beats(contract: DiaryContract) -> list[str]:
         if _contains_compact(prompt, "朋友") and _contains_compact(prompt, "吃饭"):
             return [
                 "开场：我和朋友坐下来吃饭，直接写饭桌现场。",
-                "发展：写聊天、夹菜、笑出来的小瞬间，别补餐厅名和旧经历。",
+                "发展：写饭菜气味、聊天、夹菜、笑出来的小瞬间和一句脑内 OS，别补餐厅名和旧经历。",
                 "收尾：用一句“今天确实挺开心”的碎碎念结束，不要转到数学课、预习或明天安排。",
             ]
         return [
             f"只围绕“{contract.main_topic}”写当下感受，不补旧经历。",
             f"可用锚点：{_join_inline(terms[:5]) or '本次输入本身'}。",
-            "收尾用一句轻微碎碎念，不做大道理总结。",
+            "至少写一个动作/感官细节和一句脑内 OS；收尾用一句轻微碎碎念，不做大道理总结。",
         ]
 
     humor = "humor_or_absurd_prompt" in set(getattr(contract, "risk_tags", []))
@@ -335,21 +378,21 @@ def _scene_beats(contract: DiaryContract) -> list[str]:
         return [
             f"起因：只写 RAW_PROMPT 里的本次场景：{clauses[0] if clauses else contract.main_topic}。",
             f"冲突/笑点：围绕这些梗词展开：{_join_inline(terms[:6]) or contract.main_topic}。",
-            "收尾：用一句内心 OS 或自嘲收住，不升华、不扩写旧经历。",
+            "收尾：用一句内心 OS、反差比喻或自嘲收住，不升华、不扩写旧经历。",
         ]
 
     if clauses:
         if _contains_compact(prompt, "朋友") and _contains_compact(prompt, "吃饭"):
             return [
                 "开场：第一句必须含有“朋友”和“吃饭”，直接写饭桌现场，不能改成逛店、钓具、购物或其他旧经历。",
-                "发展：写聊天、夹菜、笑出来的小瞬间，别补餐厅名和旧经历。",
+                "发展：写饭菜气味、聊天、夹菜、笑出来的小瞬间和一句脑内 OS，别补餐厅名和旧经历。",
                 "收尾：用一句“今天确实挺开心”的碎碎念结束，不要写友谊价值、小确幸、数学课、预习或明天安排。",
             ]
         beats = [f"开场：围绕“{clauses[0]}”直接进入现场。"]
         if len(clauses) > 1:
-            beats.append(f"发展：只补“{clauses[1]}”相关的动作、对话或感受。")
+            beats.append(f"发展：只补“{clauses[1]}”相关的动作、对话、感官细节或脑内 OS。")
         else:
-            beats.append(f"发展：围绕主题词 {_join_inline(terms[:5]) or contract.main_topic} 写具体场景。")
+            beats.append(f"发展：围绕主题词 {_join_inline(terms[:5]) or contract.main_topic} 写具体场景、动作和一句脑内 OS。")
         beats.append("收尾：用一句自然的碎碎念结束，不写人生总结。")
         return beats
 

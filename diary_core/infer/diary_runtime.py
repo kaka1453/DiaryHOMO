@@ -7,9 +7,11 @@ from typing import Any
 
 import torch
 
+from diary_core.config.common import PROJECT_ROOT, load_yaml_config
 from diary_core.infer.generation import generation_kwargs, trim_stop_sequences
 from diary_core.infer.guard import GuardResult, guard_diary, normalize_guard_config
-from diary_core.infer.prompt_builder import build_messages, render_prompt
+from diary_core.infer.diary_profile import select_profile_attachments
+from diary_core.infer.prompt_builder import build_messages, format_attachment_blocks, render_prompt
 from diary_core.infer.prompt_contract import DiaryContract, analyze_prompt, build_contract
 from diary_core.infer.prompt_debug import PromptDebugRun, normalize_prompt_debug_config
 
@@ -57,7 +59,7 @@ class DiaryRuntime:
         debug.write_json("02_contract.json", contract.to_dict())
         runtime = self.apply_generation_profile(runtime, contract)
 
-        attachments = self.collect_attachments(contract, context)
+        attachments = self.collect_attachments(contract, context, runtime)
         debug.write_json("03_attachments.json", attachments)
 
         messages = build_messages(contract, attachments, runtime.get("prompt_builder"))
@@ -112,7 +114,7 @@ class DiaryRuntime:
             if not self.should_retry(previous_guard, guard_config):
                 break
 
-            retry_messages = self.build_retry_messages(contract, previous_text, previous_guard)
+            retry_messages = self.build_retry_messages(contract, previous_text, previous_guard, attachments)
             debug.write_json(
                 f"09_retry_{retry_index}_messages.json",
                 retry_messages,
@@ -186,7 +188,7 @@ class DiaryRuntime:
             debug_dir=debug.run_dir_text,
         )
 
-    def collect_attachments(self, contract: DiaryContract, context: dict) -> dict:
+    def collect_attachments(self, contract: DiaryContract, context: dict, runtime: dict) -> dict:
         items = []
         if context.get("system"):
             items.append({"type": "webui_system_note", "content": context["system"]})
@@ -200,9 +202,13 @@ class DiaryRuntime:
             )
         if context.get("role"):
             items.append({"type": "webui_role", "content": context["role"]})
+
+        profile_payload = select_profile_attachments(contract, runtime.get("diary_profile"))
+        items.extend(profile_payload.get("items") or [])
         return {
-            "status": "placeholder",
+            "status": "ready",
             "items": items,
+            "diary_profile": profile_payload.get("debug") or {},
             "future_slots": ["style_card", "fact_card", "memory_summary", "rag_context"],
         }
 
@@ -316,14 +322,29 @@ class DiaryRuntime:
             return guard_config["retry_on_revise"]
         return True
 
-    def build_retry_messages(self, contract: DiaryContract, previous_draft: str, guard_result: GuardResult) -> list[dict]:
+    def build_retry_messages(
+        self,
+        contract: DiaryContract,
+        previous_draft: str,
+        guard_result: GuardResult,
+        attachments: dict | None = None,
+    ) -> list[dict]:
         guard_data = guard_result.to_dict()
+        attachment_blocks = format_attachment_blocks(attachments or {})
+        profile_section = []
+        if attachment_blocks:
+            profile_section = [
+                "",
+                "[PROFILE_ATTACHMENTS_FOR_REWRITE]",
+                attachment_blocks,
+            ]
         user_content = "\n".join(
             [
                 "[ORIGINAL_CONTRACT]",
                 f"MAIN_TOPIC: {contract.main_topic}",
                 f"TOPIC_TERMS: {_format_inline_list(contract.topic_terms)}",
                 f"FORBIDDEN_DRIFT_TOPICS: {_format_inline_list(contract.forbidden_drift_topics)}",
+                *profile_section,
                 "",
                 "[PREVIOUS_DRAFT]",
                 previous_draft.strip(),
@@ -348,6 +369,8 @@ class DiaryRuntime:
                 "允许的合理展开：现场动作、内心 OS、一句对话、轻微夸张比喻、与主题直接相关的小后果。",
                 "不允许的展开：跳到股票/算法/考试/旧聊天/旧人物长故事/未授权地点，或从当前 prompt 扩成完全无关的历史回忆。",
                 "如果原 prompt 有搞笑、难蚌、离谱、吐槽感，重写后必须保留笑点锐度；不要升华成大道理，不要写成总结报告。",
+                "如果 Guard 提示 generic/repetition/too_short/low_detail，就补一个贴题动作、一个感官细节或一句脑内 OS，而不是单纯缩短或复读主题。",
+                "如果有 MISSING_FACTS_FALLBACK_POLICY，按其中规则写：允许模糊贴题小想象，禁止未授权硬事实和旧人物长故事。",
                 "对缺失主题词要自然补回，不能只写泛泛的自由、努力、生活感受。",
             ]
         )
@@ -566,6 +589,13 @@ def main() -> None:
             "include_model_output": True,
         },
     }
+    profile_path = PROJECT_ROOT / "config" / "diary_profile.yaml"
+    if profile_path.exists():
+        runtime_config["diary_profile"] = {
+            "enabled": True,
+            "profile_path": str(profile_path),
+            "profile": load_yaml_config(profile_path, "config/diary_profile.yaml"),
+        }
     result = DiaryRuntime(runtime_config, _FakeTokenizer(), _FakeModel()).generate(args.prompt)
     print(json.dumps({"final_text": result.final_text, "debug_dir": result.debug_dir}, ensure_ascii=False, indent=2))
 

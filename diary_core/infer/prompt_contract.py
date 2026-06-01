@@ -175,6 +175,10 @@ DOMAIN_TOPIC_KEYWORDS = [
     "kaka",
     "SQ",
     "山东",
+    "树冠",
+    "圣地",
+    "导数",
+    "导数题",
     "考研",
     "复习",
     "备考",
@@ -592,6 +596,9 @@ def _extract_short_anchor_terms(prompt: str) -> list[str]:
     for term in ["山东", "宿舍", "周瑜", "kaka", "LWZ", "SQ", "德川", "纯平", "双面抱枕", "抱枕", "电梯", "女生", "五角场", "密室", "NPC", "恋爱脑"]:
         if term in prompt:
             anchors.append(term)
+    for term in ["树冠", "圣地", "导数", "导数题"]:
+        if term in prompt:
+            anchors.append(term)
     return _unique_preserve_order(anchors)
 
 
@@ -688,7 +695,9 @@ def _split_terms(text: str) -> list[str]:
 def _clean_term(term: str) -> str:
     term = term.strip(" -_[]【】()（）“”\"'‘’。，,；;：:!?！？")
     term = re.sub(r"^(今天的|今天|关于|内容|语气|风格|方式|心态|表达)", "", term)
+    term = re.sub(r"^(我在|我|在)", "", term)
     term = re.sub(r"(日记|片段|记录|生活)$", "", term)
+    term = re.sub(r"(待着|待一会|待了会|待)$", "", term)
     return term.strip(" -_[]【】()（）“”\"'‘’。，,；;：:!?！？")
 
 
