@@ -37,6 +37,7 @@ def load_training_model(runtime: dict, lora_config: LoraConfig):
         model = prepare_model_for_kbit_training(model)
     model.config.use_cache = False
     model.gradient_checkpointing_enable()
+    model.enable_input_require_grads()
     return get_peft_model(model, lora_config)
 
 
