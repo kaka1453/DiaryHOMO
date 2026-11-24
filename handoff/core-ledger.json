@@ -1,0 +1,263 @@
+{
+  "files": {
+    "lm_trainer/LICENSE": {
+      "policy": "initial",
+      "source": null,
+      "target": [
+        "947b92662ffa980a4833e08e2d89d941b776665b71ed403b7d34283206f5801a",
+        436
+      ]
+    },
+    "lm_trainer/README.md": {
+      "policy": "initial",
+      "source": null,
+      "target": [
+        "f3466687eb6b8fca1895631630b913ea87a4e991e6e84cb3bd7138a5c5eca63f",
+        436
+      ]
+    },
+    "lm_trainer/THIRD_PARTY_LICENSE.txt": {
+      "policy": "initial",
+      "source": null,
+      "target": [
+        "c58fae9a6375612b002745f0f0c88a09360307b208c60456581f6061994c921d",
+        436
+      ]
+    },
+    "lm_trainer/__init__.py": {
+      "policy": "initial",
+      "source": null,
+      "target": [
+        "2c34c57bda954570993314535acb4fcde245d0c679d1e331ec2c1c986a86a05c",
+        436
+      ]
+    },
+    "lm_trainer/__main__.py": {
+      "policy": "adapted",
+      "source": null,
+      "target": [
+        "0d49e612d398b28e7de56b5406379847e8f40cdb1dee656b2f2da7f2670cd9d2",
+        436
+      ]
+    },
+    "lm_trainer/config/__init__.py": {
+      "policy": "initial",
+      "source": null,
+      "target": [
+        "3e14f4b9d65cccc805cce6f6662b06d506a9edae4a609f2a58f8c3203b8679d4",
+        436
+      ]
+    },
+    "lm_trainer/config/common.py": {
+      "policy": "initial",
+      "source": null,
+      "target": [
+        "9f29d841ae34959cbef2319eb0544ac87295b8b2fd155d90887b4bf75c902cae",
+        436
+      ]
+    },
+    "lm_trainer/config/train_config.py": {
+      "policy": "adapted",
+      "source": null,
+      "target": [
+        "d83ed7dc46887ddb61e02e4a6dd2eb700963a8ffc6d20e65717dbca4e00808f7",
+        436
+      ]
+    },
+    "lm_trainer/generation.py": {
+      "policy": "initial",
+      "source": null,
+      "target": [
+        "ee560a774e5044078662e114719c69e523c3b9d894b8d76d4f95f8aa9dba41e2",
+        436
+      ]
+    },
+    "lm_trainer/model/__init__.py": {
+      "policy": "initial",
+      "source": null,
+      "target": [
+        "22ce74ea7a4a43be8afe75e32d9a16b029f9b839474681a6964009f9acdb18cd",
+        436
+      ]
+    },
+    "lm_trainer/model/loader.py": {
+      "policy": "initial",
+      "source": null,
+      "target": [
+        "a18a542d2411602e99efe5adbf2c977f2eb9cc6935b2dbea7ee39df5eaaac69d",
+        436
+      ]
+    },
+    "lm_trainer/model/quantization.py": {
+      "policy": "adapted",
+      "source": null,
+      "target": [
+        "e17596402c21375130417bb87c89c69f22b3df179c4756d7daa082bbfafa1732",
+        436
+      ]
+    },
+    "lm_trainer/requirements.txt": {
+      "policy": "initial",
+      "source": null,
+      "target": [
+        "37b7b647efc8bdfbdff86dffdecb852e376954a49c246de929fe368d5abc37e6",
+        436
+      ]
+    },
+    "lm_trainer/tests/test_contract.py": {
+      "policy": "initial",
+      "source": null,
+      "target": [
+        "cd19d9530b719dc3df3badc25e0963185c062d0ca7d94de27ea01f8da9cf5e11",
+        436
+      ]
+    },
+    "lm_trainer/tests/test_hf.py": {
+      "policy": "initial",
+      "source": null,
+      "target": [
+        "fdfa47c069eb682e3cf813cfcb972c4c6caf5449ae0345021a005bd19c5d7f0b",
+        436
+      ]
+    },
+    "lm_trainer/train/__init__.py": {
+      "policy": "initial",
+      "source": null,
+      "target": [
+        "9ce48d6e7b706512ca2ac0bfd6913e6a7ae8cb37d3cacc14ca512922af470bf3",
+        436
+      ]
+    },
+    "lm_trainer/train/bootstrap.py": {
+      "policy": "adapted",
+      "source": null,
+      "target": [
+        "4bf8191910ef9f635f436345f7d735d16c7ee6f112d4a7fb93337103f40762d4",
+        436
+      ]
+    },
+    "lm_trainer/train/data.py": {
+      "policy": "initial",
+      "source": null,
+      "target": [
+        "df928516d77bb013f4709fc93b2bd5e776dd41a270fc5d72b61f22faefdbdcd5",
+        436
+      ]
+    },
+    "lm_trainer/train/engine.py": {
+      "policy": "adapted",
+      "source": null,
+      "target": [
+        "26ca7bcf101682845e1ce75a8beacabe803afbb247f2ccb9898088d1765fe35f",
+        436
+      ]
+    },
+    "lm_trainer/train/io.py": {
+      "policy": "initial",
+      "source": null,
+      "target": [
+        "644273e06781479a6af48af3f7ea650fab8200208d09d629e45151f91f922397",
+        436
+      ]
+    },
+    "lm_trainer/train/metrics.py": {
+      "policy": "initial",
+      "source": null,
+      "target": [
+        "933032a6d8d475addee37eeb1c5d5f52b91d1661d2195b4a5e9dd68f9ef4c565",
+        436
+      ]
+    },
+    "lm_trainer/train/modeling.py": {
+      "policy": "adapted",
+      "source": null,
+      "target": [
+        "3dafb570a251be9a6021c4a85deea2d9ba69c28b614b7b6e68970c7dcc2adab3",
+        436
+      ]
+    },
+    "lm_trainer/train/performance.py": {
+      "policy": "adapted",
+      "source": null,
+      "target": [
+        "73dbec910f5dcdd9e947dc8d5794dd4bbb199197f27f4b5d23342aec576b6736",
+        436
+      ]
+    },
+    "lm_trainer/train/reproducibility.py": {
+      "policy": "initial",
+      "source": null,
+      "target": [
+        "9fa73f3ec5bc0a39e66f04d0231bd6e468679721108f0cbd515498a0177fa0d8",
+        436
+      ]
+    },
+    "lm_trainer/train/schedule.py": {
+      "policy": "initial",
+      "source": null,
+      "target": [
+        "66a6d0f265c1d09bee6b6c59f19cc9d7e9554352f16d43f2e55665b7b246e5a9",
+        436
+      ]
+    }
+  },
+  "initial_validation": "Receiver baseline: legacy CPU tests, independent source CPU smoke and synthetic product regression. Matching source bytes require explicit review before enrollment.",
+  "schema": 1,
+  "upstream_observation": {
+    "branch": "main",
+    "files": {
+      "lm_trainer/__main__.py": {
+        "observed_source": [
+          "28e040ab0cb6a6f74d7fb2546f575451bbcfc82fa411387e87b5e51e72ddf7c5",
+          436
+        ],
+        "relative_source": "train/train.py"
+      },
+      "lm_trainer/config/train_config.py": {
+        "observed_source": [
+          "29df151de2362cc72c8473ca3eb7c55f1eb19bba6d41c453e9ceb8e17dda14e1",
+          436
+        ],
+        "relative_source": "diary_core/config/train_config.py"
+      },
+      "lm_trainer/model/quantization.py": {
+        "observed_source": [
+          "3d3b85527166a41fc87901f57a88865fee6e42d99a3b2b70efd6019c8d9da1b0",
+          436
+        ],
+        "relative_source": "diary_core/model/quantization.py"
+      },
+      "lm_trainer/train/bootstrap.py": {
+        "observed_source": [
+          "0ef888b3214510be79b0ccd3c18a17eb086cfc9b7c7a763248f654e92243ebfc",
+          436
+        ],
+        "relative_source": "diary_core/train/bootstrap.py"
+      },
+      "lm_trainer/train/engine.py": {
+        "observed_source": [
+          "c0ccb5f1fee9a0c47a8f36f67fe555921d9f37273c3e8e3d2f9a9139afb85a07",
+          436
+        ],
+        "relative_source": "diary_core/train/engine.py"
+      },
+      "lm_trainer/train/modeling.py": {
+        "observed_source": [
+          "1dd7943539fc5dec3a5af62fbd0e9d26412e17b1081e8883229a3f17119b045b",
+          436
+        ],
+        "relative_source": "diary_core/train/modeling.py"
+      },
+      "lm_trainer/train/performance.py": {
+        "observed_source": [
+          "caac198ae27de4e3f9328c1179b7def9b55883710a0e1120d7541e8752046b6f",
+          436
+        ],
+        "relative_source": "diary_core/train/performance.py"
+      }
+    },
+    "head": "9c8014035b5b7c6f00f889776cf94cc390a1f0e0",
+    "scope": "Read-only observation of seven legacy working files; no incoming neutral snapshot approved.",
+    "sha256": "3e9a17bcd4535ae8f3b2d06b8d8f72acf3c4b0ca9ac2d8654e9b468bcef23869"
+  }
+}
