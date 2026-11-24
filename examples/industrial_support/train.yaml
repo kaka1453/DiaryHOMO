@@ -1,0 +1,17 @@
+model_name_or_path: base
+checkpoint_dir: runs/example-01
+data_file_path: questions.jsonl
+max_length: 96
+quantization_mode: none
+batch_size: 1
+shuffle: false
+auto_pad_batch: true
+epochs: 1
+gradient_accumulation_steps: 2
+lr: 0.0001
+warmup_steps: 0
+max_steps: 2
+save_steps: 4
+seed: 7
+num_workers: 0
+pin_memory: false

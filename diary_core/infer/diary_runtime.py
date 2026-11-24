@@ -8,7 +8,7 @@ from typing import Any
 import torch
 
 from diary_core.config.common import PROJECT_ROOT, load_yaml_config
-from diary_core.infer.generation import generation_kwargs, trim_stop_sequences
+from lm_trainer.generation import decode_batch, trim_stop_sequences
 from diary_core.infer.guard import GuardResult, guard_diary, normalize_guard_config
 from diary_core.infer.diary_profile import select_profile_attachments
 from diary_core.infer.prompt_builder import build_messages, format_attachment_blocks, render_prompt
@@ -280,19 +280,7 @@ class DiaryRuntime:
         return runtime
 
     def generate_rendered_prompt(self, rendered_prompt: str, runtime: dict) -> str:
-        inputs = self.tokenizer(
-            [rendered_prompt],
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-        ).to(runtime["device"])
-
-        with torch.no_grad():
-            outputs = self.model.generate(**inputs, **generation_kwargs(runtime, self.tokenizer))
-
-        input_len = inputs["input_ids"].shape[-1]
-        new_tokens = outputs[:, input_len:]
-        texts = self.tokenizer.batch_decode(new_tokens, skip_special_tokens=True)
+        texts = decode_batch([rendered_prompt], self.tokenizer, self.model, runtime)
         return texts[0] if texts else ""
 
     def postprocess(self, text: str, runtime: dict) -> tuple[str, dict]:

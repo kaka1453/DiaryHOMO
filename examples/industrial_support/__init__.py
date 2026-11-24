@@ -1,0 +1,1 @@
+"""Synthetic equipment support example."""

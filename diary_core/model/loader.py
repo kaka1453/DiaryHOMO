@@ -1,55 +1,20 @@
-from __future__ import annotations
+"""Compatibility interface for lm_trainer.model.loader."""
+
+from lm_trainer.model.loader import (
+    load_tokenizer,
+    load_base_model,
+    load_model_and_tokenizer,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    PeftModel,
+)
 
 import argparse
 import json
-
-import torch
-from peft import PeftModel
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
-from diary_core.config.infer_config import build_batch_parser, build_batch_runtime_config
-from diary_core.model.quantization import build_quantization_config
-
-
-def load_tokenizer(model_name_or_path: str, use_fast: bool | None = None):
-    load_kwargs = {
-        "trust_remote_code": True,
-    }
-    if use_fast is not None:
-        load_kwargs["use_fast"] = use_fast
-
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name_or_path,
-        **load_kwargs,
-    )
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    return tokenizer
-
-
-def load_base_model(model_name_or_path: str, quantization_mode: str = "8bit"):
-    load_kwargs = {
-        "device_map": "auto",
-        "trust_remote_code": True,
-    }
-    quantization_config = build_quantization_config(quantization_mode)
-    if quantization_config is not None:
-        load_kwargs["quantization_config"] = quantization_config
-    else:
-        load_kwargs["dtype"] = torch.float16
-
-    return AutoModelForCausalLM.from_pretrained(model_name_or_path, **load_kwargs)
-
-
-def load_model_and_tokenizer(runtime: dict):
-    tokenizer = load_tokenizer(runtime["model_name_or_path"])
-    base_model = load_base_model(
-        runtime["model_name_or_path"],
-        quantization_mode=runtime.get("quantization_mode", "8bit"),
-    )
-    model = PeftModel.from_pretrained(base_model, runtime["checkpoint_dir"])
-    model.eval()
-    return tokenizer, model
+from diary_core.config.infer_config import (
+    build_batch_parser,
+    build_batch_runtime_config,
+)
 
 
 def main() -> None:
@@ -72,7 +37,16 @@ def main() -> None:
         return
 
     tokenizer, model = load_model_and_tokenizer(runtime)
-    print(json.dumps({"tokenizer_vocab": len(tokenizer), "model_class": model.__class__.__name__}, ensure_ascii=False, indent=2))
+    print(
+        json.dumps(
+            {
+                "tokenizer_vocab": len(tokenizer),
+                "model_class": model.__class__.__name__,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

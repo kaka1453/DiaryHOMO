@@ -5,13 +5,28 @@ import argparse
 import gradio as gr
 
 from diary_core.config.common import dump_runtime_config
-from diary_core.config.infer_config import build_webui_parser, build_webui_runtime_config
-from diary_core.webui.handlers import generate_handler, load_model_handler, unload_model_handler
-from diary_core.webui.state import WebUIState
+from diary_core.config.infer_config import (
+    build_webui_parser,
+    build_webui_runtime_config,
+)
+from diary_core.webui.handlers import (
+    clear_conversation,
+    generate_handler,
+    load_model_handler,
+    unload_model_handler,
+)
+from diary_core.webui.state import Conversation, WebUIState
 
 
 def build_demo(state: WebUIState):
+    def respond(prompt, save_md, system, role, conversation):
+        reply = generate_handler(
+            state, prompt, save_md, system, role, session=conversation
+        )
+        return gr.skip() if reply is None else reply
+
     with gr.Blocks() as demo:
+        conversation = gr.State(Conversation())
         gr.Markdown("### 8bit Qwen WebUI 推理界面")
 
         with gr.Row():
@@ -39,9 +54,13 @@ def build_demo(state: WebUIState):
                 unload_btn = gr.Button("卸载模型")
 
             with gr.Column():
-                system_input = gr.Textbox(lines=2, placeholder="系统提示词", label="系统提示词")
+                system_input = gr.Textbox(
+                    lines=2, placeholder="系统提示词", label="系统提示词"
+                )
                 role_input = gr.Textbox(lines=1, placeholder="角色名", label="角色名")
-                prompt_input = gr.Textbox(lines=3, placeholder="请输入内容", label="输入")
+                prompt_input = gr.Textbox(
+                    lines=3, placeholder="请输入内容", label="输入"
+                )
                 save_md_checkbox = gr.Checkbox(
                     value=state.app_config["save_md"],
                     label="保存到MD",
@@ -60,13 +79,31 @@ def build_demo(state: WebUIState):
             ],
             outputs=output_box,
         )
-        unload_btn.click(lambda: unload_model_handler(state), outputs=output_box)
+        unload_btn.click(
+            lambda current: unload_model_handler(state, current),
+            inputs=conversation,
+            outputs=output_box,
+        )
 
         prompt_btn = gr.Button("生成/续写")
         prompt_btn.click(
-            lambda prompt, save_md, system, role: generate_handler(state, prompt, save_md, system, role),
-            inputs=[prompt_input, save_md_checkbox, system_input, role_input],
+            respond,
+            inputs=[
+                prompt_input,
+                save_md_checkbox,
+                system_input,
+                role_input,
+                conversation,
+            ],
             outputs=output_box,
+        )
+
+        clear_btn = gr.Button("清空当前会话")
+        clear_btn.click(
+            lambda current: clear_conversation(state, current),
+            inputs=conversation,
+            outputs=output_box,
+            queue=False,
         )
 
     return demo
@@ -90,4 +127,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

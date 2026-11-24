@@ -1,0 +1,14 @@
+[
+  {
+    "model": "XR-17",
+    "revision": "A",
+    "indicator": "青色",
+    "source": "XR17-A-1 §2"
+  },
+  {
+    "model": "XR-17",
+    "revision": "B",
+    "indicator": "琥珀色",
+    "source": "XR17-B-2 §4"
+  }
+]
