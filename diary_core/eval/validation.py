@@ -6,17 +6,7 @@ from pathlib import Path
 from typing import Any
 
 
-"""
-验证集用途说明：
-
-data/val/diary_validation_prompts.jsonl 只用于生成式验证和回归测试，
-用于评估 Prompt Contract、DiaryGuard、模型 checkpoint 是否守题。
-不要把它混入训练集。
-
-data/dataset/json/boa_*.jsonl 是当前日记 LM 训练数据。
-如果后续做指令化训练，请另建 data/dataset/instruction/*.jsonl
-和 data/val/instruction_validation.jsonl。
-"""
+# Evaluation entry points resolve validation paths before loading samples.
 
 
 @dataclass
@@ -83,5 +73,4 @@ def summarize_samples(samples: list[ValidationSample]) -> dict:
     return {
         "count": len(samples),
         "categories": categories,
-        "first": samples[0].to_dict() if samples else None,
     }

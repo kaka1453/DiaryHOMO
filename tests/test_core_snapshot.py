@@ -356,3 +356,140 @@ def test_industrial_example_in_export(tmp_path):
         and cfg["backend"] == "hf"
     )
     assert not (dest / "diary_core").exists() and not (dest / "config").exists()
+
+
+def test_product_asset_example_in_clean_export(tmp_path):
+    source = tmp_path / "source"
+    for name in sync.CORE + sync.EXAMPLE:
+        put(source, name, sync.regular(sync.ROOT, name).data)
+    for name in (
+        "product_assets/private/data/eval/probe.jsonl",
+        "product_assets/user/.gitkeep",
+        "product_assets/user/data/train/probe.jsonl",
+        "product_assets/example/data/train/unlisted.jsonl",
+        ".git/config",
+    ):
+        put(source, name, b"PRIVATE_FIXTURE_SENTINEL")
+
+    clean = tmp_path / "clean"
+    manifest = sync.export(source, clean, with_example=True)
+    assert set(manifest) == set(sync.CORE + sync.EXAMPLE)
+    assert set(manifest) == {
+        path.relative_to(clean).as_posix()
+        for path in clean.rglob("*")
+        if path.is_file()
+    }
+    assert {p.name for p in (clean / "product_assets").iterdir()} == {"example"}
+    assert not (clean / ".git").exists()
+
+    assets = clean / "product_assets/example"
+    other = tmp_path / "other"
+    other.mkdir()
+    env = {
+        **os.environ,
+        "PYTHONPATH": str(clean),
+        "HF_HUB_OFFLINE": "1",
+        "CUDA_VISIBLE_DEVICES": "",
+    }
+
+    def run(*args, cwd=clean, root=assets, dry_run=True):
+        return subprocess.run(
+            [
+                sys.executable,
+                "-B",
+                "-m",
+                "lm_trainer",
+                "--asset-root",
+                str(root),
+                *(["--dry-run"] if dry_run else []),
+                *args,
+            ],
+            cwd=cwd,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+    def rejected(result, *messages):
+        assert result.returncode != 0
+        assert not result.stdout
+        assert all(message in result.stderr for message in messages), result.stderr
+
+    first, second = run(), run(cwd=other)
+    assert first.returncode == second.returncode == 0, (first.stderr, second.stderr)
+    assert first.stdout == second.stdout
+    runtime = json.loads(first.stdout)
+    assert Path(runtime["train_config_path"]) == assets / "config/train.yaml"
+    assert Path(runtime["model_config_path"]) == assets / "config/model.yaml"
+    assert Path(runtime["model_name_or_path"]) == assets / "assets/base-model"
+    assert Path(runtime["checkpoint_dir"]) == assets / "checkpoints/example-run"
+    assert not Path(runtime["checkpoint_dir"]).exists()
+    training = Path(runtime["data_file_path"])
+    evaluation = Path(runtime["eval_file_path"])
+    assert training == assets / "data/train/fictional_lamp.jsonl"
+    assert evaluation == assets / "data/eval/fictional_lamp.jsonl"
+    for path, field, count in ((training, "text", 2), (evaluation, "prompt", 1)):
+        rows = [json.loads(line) for line in path.read_text().splitlines()]
+        assert len(rows) == count and all(row[field] for row in rows)
+
+    own_assets = clean / "product_assets/user"
+    command = [
+        sys.executable,
+        "-B",
+        "-m",
+        "lm_trainer",
+        "init-assets",
+        "--asset-root",
+        str(own_assets),
+    ]
+    subprocess.run(command, cwd=other, env=env, check=True, capture_output=True)
+    assert {
+        path.relative_to(own_assets).as_posix() for path in own_assets.rglob("*")
+    } == {"config", "data", "data/train", "data/eval", "assets", "checkpoints", "runs"}
+    rejected(run(root=own_assets), "config/train.yaml", "missing")
+    same_name = own_assets / training.relative_to(assets)
+    same_name.write_text("INVALID OUTSIDE DATA")
+
+    missing = assets / "config/model.yaml"
+    saved = missing.rename(missing.with_suffix(".backup"))
+    rejected(run(), "config/model.yaml", "missing")
+    saved.rename(missing)
+    rejected(run("--config", "../user/config/train.yaml"), "--config", "..")
+    rejected(run("--data-file-path", str(same_name)), "data_file_path", "relative")
+    rejected(
+        run("--data-file-path", "data/train/../../../user/probe.jsonl"),
+        "data_file_path",
+        "..",
+    )
+    rejected(
+        run("--data-file-path", "data/train/missing.jsonl"),
+        "data/train/missing.jsonl",
+        "missing",
+    )
+
+    linked_data = training.with_name("linked.jsonl")
+    linked_data.symlink_to(same_name)
+    rejected(
+        run("--data-file-path", "data/train/linked.jsonl"), "data_file_path", "symlink"
+    )
+    (assets / "runs/linked").symlink_to(own_assets / "runs", target_is_directory=True)
+    rejected(run("--checkpoint-dir", "runs/linked/run"), "checkpoint_dir", "symlink")
+    output = assets / "checkpoints/example-run"
+    output.mkdir()
+    (output / ".cache").symlink_to(own_assets / "runs", target_is_directory=True)
+    rejected(run(), "checkpoint_dir", "symlink")
+    (output / ".cache").rename(assets / "runs/cache-link")
+
+    model = other / "shared-model"
+    model.mkdir()
+    rejected(run("--model-name-or-path", str(model)), "model_name_or_path", "relative")
+    rejected(run(dry_run=False), "assets/base-model", "missing")
+    rejected(
+        run("--external-base-model", "shared-model"),
+        "--external-base-model",
+        "absolute",
+    )
+    external = run("--external-base-model", str(model))
+    assert external.returncode == 0, external.stderr
+    assert Path(json.loads(external.stdout)["model_name_or_path"]) == model

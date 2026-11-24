@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from diary_core.infer.product_content import product_value, product_wording
+
 import argparse
 from dataclasses import asdict, dataclass
 import json
@@ -7,307 +9,6 @@ import re
 
 
 SHORT_PROMPT_MAX_CHARS = 12
-
-STYLE_KEYWORDS = [
-    "搞笑",
-    "幽默",
-    "轻松",
-    "吐槽",
-    "八卦",
-    "自嘲",
-    "甜味",
-    "无奈",
-    "可爱",
-    "羞涩",
-    "真实",
-    "反转",
-    "意外结尾",
-    "调侃",
-    "反差",
-    "场景化",
-    "荒诞",
-    "难蚌",
-    "蚌",
-    "寄",
-    "破防",
-    "打工人式",
-    "夸张",
-    "戏剧化",
-    "反讽",
-    "emo",
-    "哲理",
-    "严肃",
-    "摆烂",
-    "倒霉",
-    "段子",
-    "一本正经",
-    "成熟",
-    "躺平",
-    "轻松口吻",
-    "随意",
-    "聊天一样",
-    "自黑",
-]
-
-HUMOR_CUE_WORDS = [
-    "假装",
-    "躲避",
-    "脾气火爆",
-    "分手厨房",
-    "自杀式",
-    "恋爱脑",
-    "难蚌",
-    "蚌",
-    "寄",
-    "破防",
-    "副本级",
-    "当场去世",
-    "邪恶",
-    "白嫖",
-    "抢票脚本",
-    "屁股垫",
-    "检讨危机",
-    "被迫围观",
-    "疯狂折腾",
-    "太怂",
-    "离谱",
-    "红烧肉",
-    "葱油饼",
-    "醋香",
-    "远征",
-    "洗钱工具",
-]
-
-DRIFT_TOPIC_GROUPS = {
-    "finance": ["股票", "期权", "TradingLog", "上证", "投资", "杠杆", "交易", "ETF", "EC期货", "恒生科技"],
-    "algorithm": ["算法", "布尔矩阵", "组合数", "代码", "HTTP", "getByURL", "技术文档", "SQL", "SELECT"],
-    "study_exam": [
-        "考试",
-        "CET6",
-        "高数",
-        "线性代数",
-        "作业",
-        "背单词",
-        "复习",
-        "备考",
-        "考研",
-        "课程",
-        "申请",
-        "NUS",
-        "雅思",
-        "高考",
-        "期末",
-    ],
-    "lab_project": ["实验室", "论文", "项目", "报告", "开题", "工程", "物理化学模型"],
-    "old_chat": ["旧聊天记录", "微信聊天", "截图", "消息记录", "Logseq", "Notes", "对话总结"],
-    "device_shopping": ["AirPods", "苹果店", "Apple Store", "手机号泄露", "iCloud", "AppleWatch", "闲鱼", "屏幕"],
-    "game_media": ["Genshin", "原神", "B站", "bilibili", "YouTube", "GitHub", "番剧", "外部链接"],
-    "old_person_story": ["旧人物长故事", "旧恋爱策略", "旧同学纠葛", "旧群聊复盘", "未授权人物关系扩写"],
-    "language_noise": ["日语假名", "繁体字", "英文长串", "乱码字符", "混杂外语叙述"],
-    "format_drift": ["Markdown 表格", "代码块", "外部链接", "多篇分隔符", "## 标题", "### 标题", "HTML 标签"],
-}
-
-DEFAULT_FORMAT_FORBIDDEN = [
-    "Markdown 标题",
-    "Markdown 表格",
-    "代码块",
-    "外部链接",
-    "多篇分隔符",
-    "HTML 注释",
-    "任务清单",
-    "引用块",
-    "【回忆录】标签",
-    "情况1/情况2分点",
-    "编号分点",
-]
-
-DEFAULT_FORBIDDEN_FACT_TYPES = [
-    "未经提示的具体人名",
-    "未经提示的具体地点",
-    "未经提示的学校或公司名称",
-    "未经提示的精确日期",
-    "未经提示的消费金额",
-    "未经提示的股票代码或交易价格",
-    "未出现的旧事件",
-]
-
-DEFAULT_STYLE_HINTS = [
-    "第一人称",
-    "口语化",
-    "真实私人日记",
-    "轻微自嘲",
-    "碎碎念",
-]
-
-SHORT_DAILY_PROMPTS = {
-    "啥都没干",
-    "又迟到",
-    "今天真累",
-    "家里人",
-    "我喜欢你",
-    "我爱你",
-}
-
-KEYWORD_ALIASES = {
-    "cat": "cat/邪恶表妹/孽缘纠纷",
-    "nus": "NUS",
-    "kaka": "kaka",
-    "sq": "SQ",
-    "山东": "山东",
-}
-
-DOMAIN_TOPIC_KEYWORDS = [
-    "恋爱",
-    "色情",
-    "反抗",
-    "共和党",
-    "暴政",
-    "黑纸运动",
-    "起义",
-    "重生",
-    "五百强",
-    "企业家儿子",
-    "表白",
-    "周瑜",
-    "cat",
-    "猫",
-    "NUS",
-    "kaka",
-    "SQ",
-    "山东",
-    "树冠",
-    "圣地",
-    "导数",
-    "导数题",
-    "考研",
-    "复习",
-    "备考",
-    "考试",
-    "倒霉",
-    "拖延",
-    "熬夜",
-    "崩溃",
-    "计划",
-    "摆烂",
-    "觉醒",
-    "成熟",
-    "躺平",
-    "emo",
-    "离谱",
-    "尴尬社交",
-    "琐事",
-    "趣事",
-    "日常",
-    "朋友",
-    "吃饭",
-    "书房",
-    "假装刻苦工作",
-    "躲妹妹",
-    "脾气火爆",
-    "分手厨房",
-    "自杀式",
-    "妹妹",
-    "红烧肉",
-    "葱油饼",
-    "醋香",
-    "被迫围观",
-    "抱枕",
-    "双面抱枕",
-    "电梯",
-    "屁股垫",
-    "检讨危机",
-    "抢票脚本",
-    "当场去世",
-    "破防",
-    "副本级待遇",
-]
-
-STOPWORDS = {
-    "写一篇",
-    "日记",
-    "今天",
-    "内容",
-    "相关",
-    "关于",
-    "记录",
-    "一下",
-    "一个",
-    "一种",
-    "语气",
-    "方式",
-    "风格",
-    "心态",
-    "模拟",
-    "描述",
-    "表达",
-    "不要",
-    "不能",
-    "可以",
-    "比如",
-    "像是",
-    "以及",
-    "或者",
-    "但是",
-    "有点",
-    "带点",
-    "别太正经",
-    "正文",
-}
-
-CONTRACT_PATTERNS = [
-    (
-        "style_instruction",
-        re.compile(r"用[“\"](?P<style>.+?)[”\"]风格写(?P<topic>.+?)(?:，|。|$)"),
-    ),
-    (
-        "style_instruction",
-        re.compile(r"用(?P<style>.+?)的语气描述(?P<topic>.+?)(?:，|。|$)"),
-    ),
-    (
-        "style_instruction",
-        re.compile(r"以[“\"](?P<style>.+?)[”\"]的心态写(?P<topic>.+?)(?:，|。|$)"),
-    ),
-    (
-        "style_instruction",
-        re.compile(r"请用(?P<style>.+?)的?方式记录(?P<topic>.+?)(?:，|。|$)"),
-    ),
-    (
-        "simulation_instruction",
-        re.compile(r"模拟一个[“\"](?P<topic>.+?)[”\"](?P<topic_tail>[^，。,.]{0,16})(?:，|。|$)"),
-    ),
-    (
-        "simulation_instruction",
-        re.compile(r"模拟一个[“\"]?(?P<topic>.+?)[”\"]?(?:，|用|$)"),
-    ),
-    (
-        "instruction",
-        re.compile(r"写一篇关于[“\"]?(?P<topic>.+?)[”\"]?的(?P<style>[^，。,.]{0,12})日记"),
-    ),
-    (
-        "instruction",
-        re.compile(r"写一篇[“\"](?P<topic>.+?)[”\"](?P<topic_tail>[^，。,.]{0,18})日记"),
-    ),
-    (
-        "instruction",
-        re.compile(r"写一篇[“\"](?P<topic>.+?)[”\"]的日记"),
-    ),
-    (
-        "instruction",
-        re.compile(r"写一篇(?P<topic>.+?)的日记"),
-    ),
-    (
-        "instruction",
-        re.compile(r"写一篇(?P<topic>.+?)日记"),
-    ),
-    (
-        "instruction",
-        re.compile(r"记录一下(?P<topic>.+?)(?:，|。|$)"),
-    ),
-    (
-        "instruction",
-        re.compile(r"记录(?P<topic>.+?)(?:，|。|$)"),
-    ),
-]
 
 
 @dataclass
@@ -367,32 +68,30 @@ def build_contract(raw_prompt: str, intent: dict | None = None, config: dict | N
     forbidden_drift_topics = _build_forbidden_drift_topics(
         prompt,
         topic_terms,
-        config.get("drift_topic_groups") or DRIFT_TOPIC_GROUPS,
+        config.get("drift_topic_groups") or product_value('prompt_contract', 'DRIFT_TOPIC_GROUPS'),
     )
     extra_forbidden = config.get("forbidden_drift_topics") or config.get("forbidden_topics") or []
     forbidden_drift_topics = _unique_preserve_order([*forbidden_drift_topics, *extra_forbidden])
-    format_forbidden = list(config.get("format_forbidden") or DEFAULT_FORMAT_FORBIDDEN)
+    format_forbidden = list(config.get("format_forbidden") or product_value('prompt_contract', 'DEFAULT_FORMAT_FORBIDDEN'))
     forbidden_topics = _unique_preserve_order([*forbidden_drift_topics, *format_forbidden])
-    forbidden_fact_types = list(config.get("forbidden_fact_types") or DEFAULT_FORBIDDEN_FACT_TYPES)
+    forbidden_fact_types = list(config.get("forbidden_fact_types") or product_value('prompt_contract', 'DEFAULT_FORBIDDEN_FACT_TYPES'))
     style_hints = _unique_preserve_order(
         [
-            *(config.get("style_hints") or DEFAULT_STYLE_HINTS),
+            *(config.get("style_hints") or product_value('prompt_contract', 'DEFAULT_STYLE_HINTS')),
             *(intent.get("style_hints") or []),
         ]
     )
 
     if intent["is_short_prompt"]:
         topic_lock = (
-            f"本文只能围绕“{main_topic}”产生感受、语气和模糊日常联想；"
-            f"核心词是：{_join_terms(topic_terms)}。不要把短词扩写成旧人物长故事、学习计划、股票交易或技术文档。"
+            f"{product_wording('prompt_contract', 'build_contract', 0)}{main_topic}{product_wording('prompt_contract', 'build_contract', 1)}{_join_terms(topic_terms)}{product_wording('prompt_contract', 'build_contract', 2)}"
         )
-        uncertainty_policy = "输入很短时，宁可写模糊感受、当下心理和轻微日常氛围，不补具体事实。"
+        uncertainty_policy = product_wording('prompt_contract', 'build_contract', 3)
     else:
         topic_lock = (
-            f"本文必须围绕“{main_topic}”展开；每一段都要能回到这些主题词：{_join_terms(topic_terms)}。"
-            "不要迁移到未授权旧主题。"
+            f"{product_wording('prompt_contract', 'build_contract', 4)}{main_topic}{product_wording('prompt_contract', 'build_contract', 5)}{_join_terms(topic_terms)}{product_wording('prompt_contract', 'build_contract', 6)}"
         )
-        uncertainty_policy = "缺少细节时，可以补充主观感受和模糊日常，但不要迁移旧日记事件。"
+        uncertainty_policy = product_wording('prompt_contract', 'build_contract', 7)
 
     return DiaryContract(
         raw_prompt=raw_prompt,
@@ -428,7 +127,7 @@ def _read_text(path: str) -> str:
 
 
 def _match_contract_pattern(prompt: str) -> dict:
-    for prompt_type, pattern in CONTRACT_PATTERNS:
+    for prompt_type, pattern in ((kind, re.compile(pattern)) for kind, pattern in product_value('prompt_contract', 'CONTRACT_PATTERNS')):
         match = pattern.search(prompt)
         if not match:
             continue
@@ -445,18 +144,18 @@ def _match_contract_pattern(prompt: str) -> dict:
 def _classify_prompt(prompt: str, match_info: dict) -> str:
     if not prompt:
         return "short_daily"
-    if prompt.endswith(("?", "？")) or re.match(r"^(你|我|今天).*(吗|么|嘛)[?？]?$", prompt):
+    if prompt.endswith(("?", "？")) or re.match(product_wording('prompt_contract', '_classify_prompt', 1), prompt):
         return "question"
     if match_info:
         return match_info["prompt_type"]
     compact = _compact(prompt)
-    if compact in SHORT_DAILY_PROMPTS:
+    if compact in set(product_value('prompt_contract', 'SHORT_DAILY_PROMPTS')):
         return "short_daily"
     if _looks_like_opening(prompt):
         return "opening"
     if _looks_like_keyword(prompt):
         return "keyword"
-    if re.search(r"写一篇|记录|模拟|请用|生成", prompt):
+    if re.search(product_wording('prompt_contract', '_classify_prompt', 0), prompt):
         return "instruction"
     if len(prompt) <= SHORT_PROMPT_MAX_CHARS:
         return "short_daily"
@@ -465,27 +164,27 @@ def _classify_prompt(prompt: str, match_info: dict) -> str:
 
 def _infer_main_topic(prompt: str, prompt_type: str, match_info: dict, style_hints: list[str]) -> str:
     if not prompt:
-        return "今天的私人日记"
+        return product_wording('prompt_contract', '_infer_main_topic', 0)
     if prompt_type == "keyword":
-        alias = KEYWORD_ALIASES.get(_compact(prompt).lower(), prompt)
-        return f"{alias} 相关的当下小日记"
+        alias = product_value('prompt_contract', 'KEYWORD_ALIASES').get(_compact(prompt).lower(), prompt)
+        return f"{alias}{product_wording('prompt_contract', '_infer_main_topic', 1)}"
     if prompt_type == "short_daily":
-        return f"{prompt.strip('。.!！?？')}的当下感受"
+        return f"{prompt.strip('。.!！?？')}{product_wording('prompt_contract', '_infer_main_topic', 2)}"
     if prompt_type == "question":
-        return f"围绕“{prompt}”回应近况的私人日记"
+        return f"{product_wording('prompt_contract', '_infer_main_topic', 3)}{prompt}{product_wording('prompt_contract', '_infer_main_topic', 4)}"
 
     topic = match_info.get("topic") if match_info else ""
     if not topic:
         topic = prompt
     topic = _clean_topic(topic)
-    if not topic and match_info.get("topic") in {"今天", "今天的"}:
-        topic = "今天的日常"
+    if not topic and match_info.get("topic") in {product_wording('prompt_contract', '_infer_main_topic', 7), product_wording('prompt_contract', '_infer_main_topic', 8)}:
+        topic = product_wording('prompt_contract', '_infer_main_topic', 5)
     if not topic:
         topic = prompt[:80]
 
     style_topic_terms = [item for item in style_hints if item and item not in topic]
     if style_topic_terms:
-        topic = f"{topic}，风格：{'、'.join(style_topic_terms[:3])}"
+        topic = f"{topic}{product_wording('prompt_contract', '_infer_main_topic', 6)}{'、'.join(style_topic_terms[:3])}"
     return topic[:120]
 
 
@@ -494,7 +193,7 @@ def _extract_allowed_facts(prompt: str, topic_terms: list[str] | None = None) ->
     facts = list(topic_terms or [])
     for part in parts:
         item = part.strip()
-        if not item or item in STOPWORDS:
+        if not item or item in set(product_value('prompt_contract', 'STOPWORDS')):
             continue
         if 1 <= len(item) <= 24 and item not in facts:
             facts.append(item)
@@ -506,11 +205,11 @@ def _extract_style_hints(prompt: str, match_info: dict | None = None) -> list[st
     style = (match_info or {}).get("style")
     if style:
         hints.extend(_split_terms(style))
-    for keyword in STYLE_KEYWORDS:
+    for keyword in product_value('prompt_contract', 'STYLE_KEYWORDS'):
         if keyword.lower() in prompt.lower():
             hints.append(keyword)
     if _has_humor_cue(prompt):
-        hints.extend(["搞笑", "吐槽", "反差", "场景化"])
+        hints.extend([product_wording('prompt_contract', '_extract_style_hints', 0), product_wording('prompt_contract', '_extract_style_hints', 1), product_wording('prompt_contract', '_extract_style_hints', 2), product_wording('prompt_contract', '_extract_style_hints', 3)])
     return _unique_preserve_order(
         [_clean_term(item) for item in hints if _is_valid_style_hint(_clean_term(item))]
     )
@@ -518,21 +217,21 @@ def _extract_style_hints(prompt: str, match_info: dict | None = None) -> list[st
 
 def _extract_topic_terms(prompt: str, main_topic: str) -> list[str]:
     compact_prompt = _compact(prompt).lower()
-    if compact_prompt in KEYWORD_ALIASES:
-        return _unique_preserve_order(_split_terms(KEYWORD_ALIASES[compact_prompt]))[:12]
+    if compact_prompt in product_value('prompt_contract', 'KEYWORD_ALIASES'):
+        return _unique_preserve_order(_split_terms(product_value('prompt_contract', 'KEYWORD_ALIASES')[compact_prompt]))[:12]
 
     candidates = []
     candidates.extend(_extract_short_anchor_terms(prompt))
     candidates.extend(_split_terms(main_topic))
     candidates.extend(_extract_quoted_terms(prompt))
     source = f"{prompt} {main_topic}"
-    for keyword in DOMAIN_TOPIC_KEYWORDS:
+    for keyword in product_value('prompt_contract', 'DOMAIN_TOPIC_KEYWORDS'):
         if _contains_term(source, keyword):
             candidates.append(keyword)
-    for keyword in STYLE_KEYWORDS:
+    for keyword in product_value('prompt_contract', 'STYLE_KEYWORDS'):
         if keyword.lower() in prompt.lower():
             candidates.append(keyword)
-    for group_terms in DRIFT_TOPIC_GROUPS.values():
+    for group_terms in product_value('prompt_contract', 'DRIFT_TOPIC_GROUPS').values():
         for term in group_terms:
             if _contains_term(prompt, term):
                 candidates.append(term)
@@ -555,48 +254,48 @@ def _extract_quoted_terms(prompt: str) -> list[str]:
 
 def _extract_short_anchor_terms(prompt: str) -> list[str]:
     anchors = []
-    if "书房" in prompt:
-        anchors.append("书房")
-    fake_work = re.search(r"假装[^，。！？,.；;]{1,10}", prompt)
+    if product_wording('prompt_contract', '_extract_short_anchor_terms', 0) in prompt:
+        anchors.append(product_wording('prompt_contract', '_extract_short_anchor_terms', 55))
+    fake_work = re.search(product_wording('prompt_contract', '_extract_short_anchor_terms', 1), prompt)
     if fake_work:
         anchors.append(fake_work.group(0))
-    if re.search(r"躲避[^，。！？,.；;]{0,16}妹妹", prompt):
-        anchors.append("躲妹妹")
-    if "妹妹" in prompt:
-        anchors.append("妹妹")
-    if "脾气火爆" in prompt:
-        anchors.append("脾气火爆")
-    if "分手厨房" in prompt:
-        anchors.append("分手厨房")
-    if "自杀式" in prompt:
-        anchors.append("自杀式")
+    if re.search(product_wording('prompt_contract', '_extract_short_anchor_terms', 2), prompt):
+        anchors.append(product_wording('prompt_contract', '_extract_short_anchor_terms', 56))
+    if product_wording('prompt_contract', '_extract_short_anchor_terms', 3) in prompt:
+        anchors.append(product_wording('prompt_contract', '_extract_short_anchor_terms', 57))
+    if product_wording('prompt_contract', '_extract_short_anchor_terms', 4) in prompt:
+        anchors.append(product_wording('prompt_contract', '_extract_short_anchor_terms', 58))
+    if product_wording('prompt_contract', '_extract_short_anchor_terms', 5) in prompt:
+        anchors.append(product_wording('prompt_contract', '_extract_short_anchor_terms', 59))
+    if product_wording('prompt_contract', '_extract_short_anchor_terms', 6) in prompt:
+        anchors.append(product_wording('prompt_contract', '_extract_short_anchor_terms', 60))
 
     cue_to_anchor = {
-        "被迫围观": "被迫围观",
-        "红烧肉": "红烧肉",
-        "葱油饼": "葱油饼",
-        "醋香": "醋香",
-        "抢票脚本": "抢票脚本",
-        "疯狂折腾": "疯狂折腾",
-        "屁股垫": "屁股垫",
-        "难蚌": "难蚌",
-        "检讨危机": "检讨危机",
-        "当场去世": "当场去世",
-        "破防": "破防",
-        "副本级": "副本级待遇",
-        "太怂": "太怂",
-        "离谱": "离谱",
-        "白嫖": "白嫖",
-        "邪恶": "邪恶",
+        product_wording('prompt_contract', '_extract_short_anchor_terms', 7): product_wording('prompt_contract', '_extract_short_anchor_terms', 23),
+        product_wording('prompt_contract', '_extract_short_anchor_terms', 8): product_wording('prompt_contract', '_extract_short_anchor_terms', 24),
+        product_wording('prompt_contract', '_extract_short_anchor_terms', 9): product_wording('prompt_contract', '_extract_short_anchor_terms', 25),
+        product_wording('prompt_contract', '_extract_short_anchor_terms', 10): product_wording('prompt_contract', '_extract_short_anchor_terms', 26),
+        product_wording('prompt_contract', '_extract_short_anchor_terms', 11): product_wording('prompt_contract', '_extract_short_anchor_terms', 27),
+        product_wording('prompt_contract', '_extract_short_anchor_terms', 12): product_wording('prompt_contract', '_extract_short_anchor_terms', 28),
+        product_wording('prompt_contract', '_extract_short_anchor_terms', 13): product_wording('prompt_contract', '_extract_short_anchor_terms', 29),
+        product_wording('prompt_contract', '_extract_short_anchor_terms', 14): product_wording('prompt_contract', '_extract_short_anchor_terms', 30),
+        product_wording('prompt_contract', '_extract_short_anchor_terms', 15): product_wording('prompt_contract', '_extract_short_anchor_terms', 31),
+        product_wording('prompt_contract', '_extract_short_anchor_terms', 16): product_wording('prompt_contract', '_extract_short_anchor_terms', 32),
+        product_wording('prompt_contract', '_extract_short_anchor_terms', 17): product_wording('prompt_contract', '_extract_short_anchor_terms', 33),
+        product_wording('prompt_contract', '_extract_short_anchor_terms', 18): product_wording('prompt_contract', '_extract_short_anchor_terms', 34),
+        product_wording('prompt_contract', '_extract_short_anchor_terms', 19): product_wording('prompt_contract', '_extract_short_anchor_terms', 35),
+        product_wording('prompt_contract', '_extract_short_anchor_terms', 20): product_wording('prompt_contract', '_extract_short_anchor_terms', 36),
+        product_wording('prompt_contract', '_extract_short_anchor_terms', 21): product_wording('prompt_contract', '_extract_short_anchor_terms', 37),
+        product_wording('prompt_contract', '_extract_short_anchor_terms', 22): product_wording('prompt_contract', '_extract_short_anchor_terms', 38),
     }
     for cue, anchor in cue_to_anchor.items():
         if cue in prompt:
             anchors.append(anchor)
 
-    for term in ["山东", "宿舍", "周瑜", "kaka", "LWZ", "SQ", "德川", "纯平", "双面抱枕", "抱枕", "电梯", "女生", "五角场", "密室", "NPC", "恋爱脑"]:
+    for term in [product_wording('prompt_contract', '_extract_short_anchor_terms', 39), product_wording('prompt_contract', '_extract_short_anchor_terms', 40), product_wording('prompt_contract', '_extract_short_anchor_terms', 41), "kaka", "LWZ", "SQ", product_wording('prompt_contract', '_extract_short_anchor_terms', 42), product_wording('prompt_contract', '_extract_short_anchor_terms', 43), product_wording('prompt_contract', '_extract_short_anchor_terms', 44), product_wording('prompt_contract', '_extract_short_anchor_terms', 45), product_wording('prompt_contract', '_extract_short_anchor_terms', 46), product_wording('prompt_contract', '_extract_short_anchor_terms', 47), product_wording('prompt_contract', '_extract_short_anchor_terms', 48), product_wording('prompt_contract', '_extract_short_anchor_terms', 49), "NPC", product_wording('prompt_contract', '_extract_short_anchor_terms', 50)]:
         if term in prompt:
             anchors.append(term)
-    for term in ["树冠", "圣地", "导数", "导数题"]:
+    for term in [product_wording('prompt_contract', '_extract_short_anchor_terms', 51), product_wording('prompt_contract', '_extract_short_anchor_terms', 52), product_wording('prompt_contract', '_extract_short_anchor_terms', 53), product_wording('prompt_contract', '_extract_short_anchor_terms', 54)]:
         if term in prompt:
             anchors.append(term)
     return _unique_preserve_order(anchors)
@@ -613,7 +312,7 @@ def _build_forbidden_drift_topics(prompt: str, topic_terms: list[str], groups: d
 
 
 def _group_is_authorized(prompt_terms: str, terms: list[str]) -> bool:
-    return any(_contains_term(prompt_terms, term) for term in terms if not term.startswith(("旧", "未授权")))
+    return any(_contains_term(prompt_terms, term) for term in terms if not term.startswith((product_wording('prompt_contract', '_group_is_authorized', 0), product_wording('prompt_contract', '_group_is_authorized', 1))))
 
 
 def _infer_length_hint(prompt: str, prompt_type: str) -> str:
@@ -636,30 +335,30 @@ def _infer_risk_tags(prompt: str, prompt_type: str, topic_terms: list[str]) -> l
         tags.append("fragment_opening_expansion_risk")
     if re.search(r"[A-Za-z]{2,}", prompt):
         tags.append("multilingual_trigger")
-    if any(_contains_term(prompt, term) for term in ["色情", "恋爱"]):
+    if any(_contains_term(prompt, term) for term in [product_wording('prompt_contract', '_infer_risk_tags', 1), product_wording('prompt_contract', '_infer_risk_tags', 2)]):
         tags.append("romance_or_adult_style")
-    if _contains_term(prompt, "色情"):
+    if _contains_term(prompt, product_wording('prompt_contract', '_infer_risk_tags', 0)):
         tags.append("adult_content_boundary")
-    if any(_contains_term(prompt, term) for term in ["共和党", "黑纸运动", "起义", "暴政"]):
+    if any(_contains_term(prompt, term) for term in [product_wording('prompt_contract', '_infer_risk_tags', 3), product_wording('prompt_contract', '_infer_risk_tags', 4), product_wording('prompt_contract', '_infer_risk_tags', 5), product_wording('prompt_contract', '_infer_risk_tags', 6)]):
         tags.append("political_fiction")
-    if any(_contains_term(prompt, term) for term in ["重生", "模拟"]):
+    if any(_contains_term(prompt, term) for term in [product_wording('prompt_contract', '_infer_risk_tags', 7), product_wording('prompt_contract', '_infer_risk_tags', 8)]):
         tags.append("fictional_setup")
     if any(term.lower() in {"cat", "kaka", "sq", "nus"} for term in topic_terms):
         tags.append("named_keyword")
-    if _has_humor_cue(prompt) or any(term in {"搞笑", "幽默", "吐槽", "夸张", "戏剧化", "反差", "段子", "难蚌", "破防"} for term in topic_terms):
+    if _has_humor_cue(prompt) or any(term in {product_wording('prompt_contract', '_infer_risk_tags', 9), product_wording('prompt_contract', '_infer_risk_tags', 10), product_wording('prompt_contract', '_infer_risk_tags', 11), product_wording('prompt_contract', '_infer_risk_tags', 12), product_wording('prompt_contract', '_infer_risk_tags', 13), product_wording('prompt_contract', '_infer_risk_tags', 14), product_wording('prompt_contract', '_infer_risk_tags', 15), product_wording('prompt_contract', '_infer_risk_tags', 16), product_wording('prompt_contract', '_infer_risk_tags', 17)} for term in topic_terms):
         tags.append("humor_or_absurd_prompt")
     return _unique_preserve_order(tags)
 
 
 def _has_humor_cue(prompt: str) -> bool:
-    return any(cue.lower() in prompt.lower() for cue in HUMOR_CUE_WORDS)
+    return any(cue.lower() in prompt.lower() for cue in product_value('prompt_contract', 'HUMOR_CUE_WORDS'))
 
 
 def _looks_like_keyword(prompt: str) -> bool:
     if re.search(r"[，。！？,.!?；;：:\s]", prompt):
         return False
     compact = _compact(prompt)
-    if compact.lower() in KEYWORD_ALIASES:
+    if compact.lower() in product_value('prompt_contract', 'KEYWORD_ALIASES'):
         return True
     if re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{1,10}", compact):
         return True
@@ -671,7 +370,7 @@ def _looks_like_opening(prompt: str) -> bool:
         return False
     if prompt.endswith(("，", "：", ":")):
         return True
-    if prompt.startswith(("今天", "我向", "这不", "黑人")) and not prompt.endswith(("。", "！", "？", ".", "!", "?")):
+    if prompt.startswith((product_wording('prompt_contract', '_looks_like_opening', 0), product_wording('prompt_contract', '_looks_like_opening', 1), product_wording('prompt_contract', '_looks_like_opening', 2), product_wording('prompt_contract', '_looks_like_opening', 3))) and not prompt.endswith(("。", "！", "？", ".", "!", "?")):
         return True
     return False
 
@@ -702,7 +401,7 @@ def _clean_term(term: str) -> str:
 
 
 def _is_valid_topic_term(term: str) -> bool:
-    if not term or term in STOPWORDS:
+    if not term or term in set(product_value('prompt_contract', 'STOPWORDS')):
         return False
     if any(marker in term for marker in ["相关的当下", "当下感受", "回应近况"]):
         return False
@@ -714,11 +413,11 @@ def _is_valid_topic_term(term: str) -> bool:
 
 
 def _is_valid_style_hint(term: str) -> bool:
-    if not term or term in STOPWORDS:
+    if not term or term in set(product_value('prompt_contract', 'STOPWORDS')):
         return False
-    if term in STYLE_KEYWORDS:
+    if term in product_value('prompt_contract', 'STYLE_KEYWORDS'):
         return True
-    if any(keyword in term for keyword in STYLE_KEYWORDS):
+    if any(keyword in term for keyword in product_value('prompt_contract', 'STYLE_KEYWORDS')):
         return True
     if len(term) <= 8 and not re.search(r"记录|描述|事件|日记|生活|片段", term):
         return True
@@ -753,36 +452,23 @@ def _join_terms(terms: list[str]) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="DiaryContract rule analyzer")
-    parser.add_argument("--prompt", default=None, help="Analyze one prompt.")
-    parser.add_argument("--from-output-md", default=None, help="Extract 引言 prompts from output markdown and analyze all.")
+    from diary_core.config.assets import add_asset_root, product_root
+    from diary_core.infer.product_content import load_product_content, using_product_content
+    from lm_trainer.config.common import asset_path
+
+    parser = argparse.ArgumentParser(description="Analyze product prompt structure")
+    add_asset_root(parser)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--prompt", help="Analyze a single synthetic prompt")
+    source.add_argument("--from-output-md", help="Read an output file under runs/")
     args = parser.parse_args()
-
-    prompts = []
-    if args.from_output_md:
-        prompts.extend(extract_prompts_from_output_md(args.from_output_md))
-    if args.prompt:
-        prompts.append(args.prompt)
-    if not prompts:
-        prompts.append("今天和朋友吃饭，很开心。")
-
-    payload = []
-    for prompt in prompts:
-        contract = build_contract(prompt)
-        payload.append(
-            {
-                "prompt": prompt,
-                "prompt_type": contract.prompt_type,
-                "main_topic": contract.main_topic,
-                "topic_terms": contract.topic_terms,
-                "style_hints": contract.style_hints,
-                "forbidden_drift_topics": contract.forbidden_drift_topics,
-                "format_forbidden": contract.format_forbidden,
-                "length_hint": contract.length_hint,
-                "risk_tags": contract.risk_tags,
-            }
-        )
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    root = product_root(args.asset_root)
+    prompts = [args.prompt] if args.prompt else extract_prompts_from_output_md(
+        asset_path(root, args.from_output_md, "--from-output-md", "runs")
+    )
+    with using_product_content(load_product_content(root)):
+        contracts = [build_contract(prompt) for prompt in prompts]
+    print(json.dumps({"count": len(contracts), "types": [contract.prompt_type for contract in contracts]}))
 
 
 if __name__ == "__main__":

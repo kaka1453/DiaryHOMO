@@ -1,8 +1,18 @@
 import re
 import json
 
-input_file = "diary_boa.md"
-output_file = "diary_boa.jsonl"
+from pathlib import Path
+import sys
+
+sys.dont_write_bytecode = True
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from diary_core.data.preprocess import preprocessing_paths
+
+input_file, output_file = preprocessing_paths(
+    source='data/raw/diary_boa.md',
+    target='data/train/diary_boa.jsonl',
+)
 
 # ========= 1️⃣ 严格定义「分隔符行」 =========
 
@@ -52,15 +62,7 @@ while i < n:
     else:
         i += 1
 
-# ========= 3️⃣ 打印所有匹配到的分隔符（用于检查） =========
-
-print("===== 🧭 匹配到的分隔符块 =====")
-for idx, (s, e) in enumerate(separator_blocks, 1):
-    print(f"\n--- 分隔符块 {idx} ---")
-    for line in lines[s:e]:
-        print(line.rstrip())
-
-print("\n===== 🧭 分隔符检查完毕 =====\n")
+print(f"匹配到 {len(separator_blocks)} 个分隔符块")
 
 # ========= 4️⃣ 提取正文并写入 JSONL =========
 

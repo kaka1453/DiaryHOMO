@@ -30,3 +30,14 @@ generate/validation/*
 debug/*
 
 config/diary_profile.yaml
+
+/product_assets/private/
+/product_assets/user/*
+!/product_assets/user/.gitkeep
+/data/val/diary_validation_prompts.jsonl
+
+/product_assets/example/assets/base/
+/product_assets/example/checkpoints/*
+!/product_assets/example/checkpoints/.gitkeep
+/product_assets/example/runs/*
+!/product_assets/example/runs/.gitkeep

@@ -1,4 +1,6 @@
 import sys
+
+sys.dont_write_bytecode = True
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -11,6 +13,7 @@ from diary_core.config.common import (
     resolve_path,
     str2bool,
 )
+from diary_core.config.assets import build_or_exit, configure_caches, product_root
 from diary_core.config.train_config import (
     ALLOWED_QUANTIZATION_MODES,
     BOOL_FIELDS,
@@ -117,13 +120,14 @@ def build_quantization_config(runtime):
 def main():
     parser = build_parser()
     args = parser.parse_args()
-    runtime = build_runtime_config(args)
+    runtime = build_or_exit(parser, build_runtime_config, args)
 
     if args.dry_run:
         print("Train 配置检查通过。")
         print(dump_runtime_config(runtime))
         return
 
+    configure_caches(product_root(runtime["asset_root"]))
     if not args.simulate_only and _dispatch_unsloth(runtime, [__file__, *sys.argv[1:]]):
         return
 

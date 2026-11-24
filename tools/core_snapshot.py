@@ -56,10 +56,23 @@ EXAMPLE = tuple(
         "model.yaml",
         "questions.jsonl",
     )
+) + (
+    "product_assets/example/config/train.yaml",
+    "product_assets/example/config/model.yaml",
+    "product_assets/example/data/train/fictional_lamp.jsonl",
+    "product_assets/example/data/eval/fictional_lamp.jsonl",
+    "product_assets/example/assets/.gitkeep",
+    "product_assets/example/checkpoints/.gitkeep",
+    "product_assets/example/runs/.gitkeep",
 )
 DENY = re.compile(
     r"diary[_-]?(?:core|homo)|\bboa(?:\d+|\b|_)|日记|小飞鱼|人格卡|/home/jutze|/Users/a114514|PRIVATE_FIXTURE_SENTINEL|-----BEGIN [^\n]*PRIVATE KEY-----|\bhf_[A-Za-z0-9]{24,}",
     re.I,
+)
+OLD_ASSET_PATH = re.compile(
+    r"data/(?:dataset|val|large_language_model)(?:/|\b)|checkpoint/old_ckpt|"
+    r"generate/(?:input_prompt|output|validation)|debug/(?:memory|prompt)|"
+    r"product_assets/(?:private|user)(?:/|\b)|webui/diary_outputs"
 )
 DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
 
@@ -124,7 +137,7 @@ def regular(root, name):
 
 def check_content(name, file):
     text = file.data.decode("utf-8")
-    if "\x00" in text or DENY.search(text):
+    if "\x00" in text or DENY.search(text) or OLD_ASSET_PATH.search(text):
         raise ValueError(f"content review required for {name}")
 
 

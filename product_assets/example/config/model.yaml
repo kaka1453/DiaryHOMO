@@ -1,0 +1,5 @@
+lora_r: 2
+lora_alpha: 4
+lora_target_modules: [q_proj]
+lora_dropout: 0.0
+lora_bias: none

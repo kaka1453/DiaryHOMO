@@ -1,19 +1,21 @@
 from __future__ import annotations
 
-import argparse
+from pathlib import Path
 
-import torch
-
+from diary_core.config.assets import build_or_exit, configure_caches, runtime_output
 from diary_core.config.common import dump_runtime_config
-from diary_core.config.infer_config import build_batch_parser, build_batch_runtime_config
-from diary_core.infer.diary_runtime import DiaryRuntime
-from diary_core.infer.audit import build_audit_record, append_audit_record, write_audit_artifacts
+from diary_core.config.infer_config import build_batch_parser, build_batch_runtime_config, inference_summary
 from diary_core.infer.output_bundle import prepare_output_bundle, write_parameters
 from diary_core.infer.prompt_io import format_markdown_block, load_prompts, write_results
-from diary_core.model.loader import load_model_and_tokenizer
 
 
 def run_generation(runtime: dict) -> None:
+    import torch
+
+    from diary_core.infer.audit import build_audit_record, append_audit_record, write_audit_artifacts
+    from diary_core.infer.diary_runtime import DiaryRuntime
+    from diary_core.model.loader import load_model_and_tokenizer
+
     torch.backends.cuda.matmul.allow_tf32 = True
     prepare_output_bundle(runtime)
     write_parameters(runtime)
@@ -48,28 +50,22 @@ def run_generation(runtime: dict) -> None:
                 debug_dir=result.debug_dir,
                 audit_config=runtime.get("audit"),
             )
-            if runtime["print_prompts"]:
-                print(block)
             results.append(block)
 
-    write_results(results, runtime["output_file"])
+    write_results(results, runtime_output(Path(runtime["asset_root"]), runtime["output_file"]))
     write_audit_artifacts(runtime["output_run_dir"], audit_records, runtime.get("audit"))
     print(f"\n8bit 推理完成，共 {len(results)} 篇，输出目录: {runtime['output_run_dir']}")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Batch inference module smoke test")
-    parser.add_argument("--config", default=None)
-    parser.add_argument("--dry-run", action="store_true")
+    parser = build_batch_parser()
     args = parser.parse_args()
-
-    argv = ["--dry-run"]
-    if args.config:
-        argv.extend(["--config", args.config])
-    runtime = build_batch_runtime_config(build_batch_parser().parse_args(argv))
-    print(dump_runtime_config(runtime))
-    if not args.dry_run:
-        run_generation(runtime)
+    runtime = build_or_exit(parser, build_batch_runtime_config, args)
+    if args.dry_run:
+        print(dump_runtime_config(inference_summary(runtime)))
+        return
+    configure_caches(Path(runtime["asset_root"]))
+    run_generation(runtime)
 
 
 if __name__ == "__main__":

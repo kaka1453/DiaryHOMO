@@ -86,11 +86,16 @@ def write_results(results: list[str], output_file: str) -> None:
 
 
 def main() -> None:
+    from diary_core.config.assets import add_asset_root, product_root
+    from lm_trainer.config.common import asset_path
+
     parser = argparse.ArgumentParser(description="Prompt IO smoke test")
+    add_asset_root(parser)
     parser.add_argument("--input-file", required=True)
     args = parser.parse_args()
-    prompts = load_prompts(args.input_file)
-    print(json.dumps({"count": len(prompts), "first": prompts[0]}, ensure_ascii=False, indent=2))
+    root = product_root(args.asset_root)
+    prompts = load_prompts(asset_path(root, args.input_file, "--input-file", "assets/prompts", "data/eval"))
+    print(json.dumps({"count": len(prompts)}, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from diary_core.infer.product_content import product_value
+
 from typing import Any
 import re
 
@@ -8,34 +10,8 @@ from diary_core.infer.prompt_contract import DiaryContract
 
 DEFAULT_DIARY_PROFILE_CONFIG = {
     "enabled": False,
-    "profile_path": "config/diary_profile.yaml",
     "profile": {},
 }
-
-FACT_RELEVANCE_KEYWORDS = {
-    "identity": ["自我", "自己", "外貌", "身高", "普通", "平凡", "儒雅", "温和"],
-    "ability_and_history": ["学习", "学校", "大学", "双非", "鼠专", "考研", "NUS", "导数", "高数", "课程", "图书馆", "树冠", "报告"],
-    "temperament": ["焦虑", "抑郁", "害怕", "决策", "胆子", "无畏", "慕强", "摆烂", "躺平", "自嘲"],
-    "relationships": ["恋爱", "表白", "喜欢", "爱你", "感情", "女生", "SQ", "苏颀", "周瑜", "朋友", "室友"],
-    "interests": ["股票", "钱", "金钱", "赚钱", "交易", "科技", "AI", "Cursor", "工具", "游戏", "抽卡"],
-}
-
-HISTORY_TRIGGER_TERMS = [
-    "NUS",
-    "鼠专",
-    "SQ",
-    "苏颀",
-    "周瑜",
-    "kaka",
-    "hb",
-    "山东",
-    "树冠",
-    "圣地",
-    "考研",
-    "股票",
-    "高考",
-    "恋爱",
-]
 
 
 def normalize_diary_profile_config(config: dict | None) -> dict:
@@ -192,7 +168,7 @@ def _maybe_add_fact_card(candidates: dict, decisions: list[dict], profile: dict,
         decisions.append({"section": "fact_card", "injected": False, "reason": "missing_fact_card"})
         return
     relevant_sections = []
-    for section, keywords in FACT_RELEVANCE_KEYWORDS.items():
+    for section, keywords in product_value('diary_profile', 'FACT_RELEVANCE_KEYWORDS').items():
         if any(_contains(source_text, keyword) for keyword in keywords):
             relevant_sections.append(section)
     if not relevant_sections:
@@ -230,8 +206,8 @@ def _maybe_add_history_summary(
     if not history:
         decisions.append({"section": "history_summary", "injected": False, "reason": "missing_history_summary"})
         return
-    matched_history = [term for term in HISTORY_TRIGGER_TERMS if _contains(source_text, term)]
-    matched_profile_terms = [item["term"] for item in matched_terms if item.get("term") in HISTORY_TRIGGER_TERMS]
+    matched_history = [term for term in product_value('diary_profile', 'HISTORY_TRIGGER_TERMS') if _contains(source_text, term)]
+    matched_profile_terms = [item["term"] for item in matched_terms if item.get("term") in product_value('diary_profile', 'HISTORY_TRIGGER_TERMS')]
     if not matched_history and not matched_profile_terms:
         decisions.append({"section": "history_summary", "injected": False, "reason": "no_old_topic_or_proper_noun"})
         return

@@ -1,15 +1,8 @@
 from __future__ import annotations
 
-import argparse
-import json
 from pathlib import Path
 from uuid import uuid4
 
-from diary_core.config.common import dump_runtime_config
-from diary_core.config.infer_config import (
-    build_webui_parser,
-    build_webui_runtime_config,
-)
 from diary_core.infer.audit import (
     AUDIT_JSONL_FILENAME,
     append_audit_record,
@@ -167,76 +160,10 @@ def generate_handler(
         return reply
 
 
-def _build_runtime_args(args: argparse.Namespace) -> argparse.Namespace:
-    excluded = {"real_test", "message", "system", "role"}
-    return argparse.Namespace(
-        **{key: value for key, value in vars(args).items() if key not in excluded}
-    )
-
-
 def main() -> None:
-    parser = build_webui_parser()
-    parser.add_argument(
-        "--real-test",
-        dest="real_test",
-        action="store_true",
-        help="Load model and run one message.",
-    )
-    parser.add_argument("--message", default="今天测试一下拆分后的 WebUI 后端。")
-    parser.add_argument("--system", default="你是包包。")
-    parser.add_argument("--role", default="用户")
-    args = parser.parse_args()
+    from diary_core.webui.app import main as app_main
 
-    if args.real_test:
-        runtime = build_webui_runtime_config(_build_runtime_args(args))
-        prepare_output_bundle(runtime)
-        write_parameters(runtime)
-        state = WebUIState(runtime)
-        print(dump_runtime_config(runtime))
-        print(
-            load_model_handler(
-                state,
-                runtime["max_new_tokens"],
-                runtime["temperature"],
-                runtime["top_p"],
-                runtime["top_k"],
-                runtime["repetition_penalty"],
-                runtime["num_beams"],
-            )
-        )
-        reply = generate_handler(
-            state, args.message, runtime["save_md"], system=args.system, role=args.role
-        )
-        print(
-            json.dumps(
-                {"reply": reply, "history_items": len(state.conversation_history)},
-                ensure_ascii=False,
-                indent=2,
-            )
-        )
-        print(unload_model_handler(state))
-        return
-
-    state = WebUIState(
-        {
-            "max_new_tokens": 8,
-            "temperature": 0.9,
-            "top_p": 0.9,
-            "top_k": 60,
-            "repetition_penalty": 1.2,
-            "num_beams": 1,
-            "output_root": "generate/output",
-            "output_name": "boa256日记",
-            "output_run_dir": "generate/output/boa256日记/dev",
-        }
-    )
-    print(
-        json.dumps(
-            {"handler": "ready", "history_items": len(state.conversation_history)},
-            ensure_ascii=False,
-            indent=2,
-        )
-    )
+    app_main()
 
 
 if __name__ == "__main__":

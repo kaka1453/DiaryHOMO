@@ -1,7 +1,17 @@
 import re
 
-input_file = "yuanzhikong.md"
-output_file = "yuanzhikong_checked.md"
+from pathlib import Path
+import sys
+
+sys.dont_write_bytecode = True
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+from diary_core.data.preprocess import preprocessing_paths
+
+input_file, output_file = preprocessing_paths(
+    source='data/raw/yuanzhikong.md',
+    target='runs/preprocess/yuanzhikong_checked.md',
+)
 MAX_LENGTH = 512  # 自定义阈值（按字符数算，可调整）
 
 # 匹配日记标题的正则，如 "## 2024/9/24" 或 "## 2025/1/13 周一"

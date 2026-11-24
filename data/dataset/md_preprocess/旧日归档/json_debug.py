@@ -1,24 +1,35 @@
 import json
 import csv
-from transformers import AutoTokenizer
 
 # === 核心配置 ===
 MAX_TOKENS = 256
 OVERLAP_TARGET = 40       
 SAFE_BUFFER = 15          # 增加一点缓冲，用于容纳“「裁剪」”标记的长度
-MODEL_ID = "Qwen/Qwen2.5-7B"
+from pathlib import Path
+import sys
+
+sys.dont_write_bytecode = True
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+from diary_core.data.preprocess import preprocessing_paths
+
+input_file, output_file, stats_file, MODEL_ID = preprocessing_paths(
+    source='data/train/diary_boa.jsonl',
+    target='data/train/diary_resize.jsonl',
+    stats='runs/preprocess/token_stats.csv',
+    tokenizer=True,
+)
 
 CUT_LIMIT = MAX_TOKENS - OVERLAP_TARGET - SAFE_BUFFER
 
-input_file = "diary_boa.jsonl"
-output_file = "diary_resize.jsonl"
-stats_file = "token_stats.csv"
 
 # 裁剪标记
 CUT_MARKER = "「裁剪」"
 
 print(f"正在加载 Tokenizer ({MODEL_ID})...")
-tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
+from transformers import AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, local_files_only=True, trust_remote_code=True)
 
 def get_token_len(text):
     return len(tokenizer.encode(text, add_special_tokens=False))

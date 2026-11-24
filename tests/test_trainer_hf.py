@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -75,7 +76,10 @@ def test_hf_cli_synthetic_adapter_round_trip(tmp_path, save_every):
     from tokenizers.pre_tokenizers import Whitespace
     from transformers import PreTrainedTokenizerFast, Qwen2Config, Qwen2ForCausalLM
 
-    base, output = tmp_path / "base", tmp_path / "out"
+    root = Path(__file__).resolve().parents[1]
+    assets = tmp_path / "assets"
+    shutil.copytree(root / "product_assets/example", assets)
+    base, output = tmp_path / "base", assets / "checkpoints/out"
     vocab = {
         ch: i for i, ch in enumerate(["<pad>", "<unk>", *"onetwhrĠ", "<|endoftext|>"])
     }
@@ -106,7 +110,7 @@ def test_hf_cli_synthetic_adapter_round_trip(tmp_path, save_every):
             pad_token_id=0,
         )
     ).save_pretrained(base)
-    data = tmp_path / "fixture.jsonl"
+    data = assets / "data/train/fixture.jsonl"
     data.write_text(
         "".join(
             json.dumps({"text": text}) + "\n"
@@ -126,12 +130,14 @@ def test_hf_cli_synthetic_adapter_round_trip(tmp_path, save_every):
     cmd = [
         sys.executable,
         "train/train.py",
-        "--model-name-or-path",
+        "--asset-root",
+        str(assets),
+        "--external-base-model",
         str(base),
         "--checkpoint-dir",
-        str(output),
+        "checkpoints/out",
         "--data-file-path",
-        str(data),
+        "data/train/fixture.jsonl",
         "--quantization-mode",
         "none",
         "--lora-target-modules",

@@ -1,6 +1,5 @@
 import json
 import csv
-from transformers import AutoTokenizer
 
 # === 核心配置 ===
 MAX_TOKENS = 256
@@ -9,18 +8,30 @@ MIN_OVERLAP_TOKENS = 10   # 严防偷渡门槛
 MAX_OVERLAP_LIMIT = 60   
 SAFE_BUFFER = 5          # 只需要留一点给 \n\n 的空间即可，不用留给标记了
 
-MODEL_ID = "Qwen/Qwen2.5-7B"
+from pathlib import Path
+import sys
+
+sys.dont_write_bytecode = True
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from diary_core.data.preprocess import preprocessing_paths
+
+input_file, output_file, stats_file, error_log_file, MODEL_ID = preprocessing_paths(
+    source='data/train/diary_resize256.jsonl',
+    target='data/train/256diary_resize.jsonl',
+    stats='runs/preprocess/token_stats.csv',
+    errors='runs/preprocess/error_log.txt',
+    tokenizer=True,
+)
 
 # 第一轮切割限制
 CUT_LIMIT = MAX_TOKENS - OVERLAP_TARGET - SAFE_BUFFER
 
-input_file = "diary_resize256.jsonl"
-output_file = "256diary_resize.jsonl"
-stats_file = "token_stats.csv"
-error_log_file = "error_log.txt" # 专门存放报错的文件
 
 print(f"正在加载 Tokenizer ({MODEL_ID})...")
-tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
+from transformers import AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, local_files_only=True, trust_remote_code=True)
 
 # 全局错误收集器
 issue_report = []
@@ -220,11 +231,10 @@ def print_summary(chunks, overlaps):
         # 写入独立日志文件
         with open(error_log_file, 'w', encoding='utf-8') as f:
             for issue in issue_report:
-                print(issue) # 打印到控制台
                 f.write(issue + "\n") # 写入文件
         print("-" * 50)
         print(f"详细错误日志已保存至: {error_log_file}")
-        print("请打开 diary_resize.jsonl 搜索 '【' 快速定位修复。")
+        print(f"请检查资产根下的分词结果: {output_file}")
 
 if __name__ == "__main__":
     chunks, overlaps = process_diary()

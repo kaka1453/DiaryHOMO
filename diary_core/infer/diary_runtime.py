@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-import argparse
+from pathlib import Path
+
+from diary_core.infer.product_content import product_value, product_wording, using_product_content
+
 from dataclasses import asdict, dataclass
-import json
 from typing import Any
 
 import torch
 
-from diary_core.config.common import PROJECT_ROOT, load_yaml_config
 from lm_trainer.generation import decode_batch, trim_stop_sequences
 from diary_core.infer.guard import GuardResult, guard_diary, normalize_guard_config
 from diary_core.infer.diary_profile import select_profile_attachments
@@ -16,7 +17,6 @@ from diary_core.infer.prompt_contract import DiaryContract, analyze_prompt, buil
 from diary_core.infer.prompt_debug import PromptDebugRun, normalize_prompt_debug_config
 
 
-HUMOR_PROFILE_STYLE_HINTS = {"搞笑", "幽默", "吐槽", "夸张", "戏剧化", "反差", "段子", "难蚌", "破防", "场景化"}
 GENERATION_PROFILE_KEYS = {"temperature", "top_p", "top_k", "repetition_penalty", "max_new_tokens"}
 
 
@@ -48,8 +48,13 @@ class DiaryRuntime:
         self.model = model
 
     def generate(self, raw_prompt: str, **kwargs) -> DiaryResult:
+        with using_product_content(self.runtime_config["product_content"]):
+            return self._generate(raw_prompt, **kwargs)
+
+    def _generate(self, raw_prompt: str, **kwargs) -> DiaryResult:
         runtime, context = self._build_call_runtime(kwargs)
-        debug = PromptDebugRun(runtime.get("prompt_debug"))
+        root = Path(runtime["asset_root"]) if runtime.get("asset_root") else None
+        debug = PromptDebugRun(runtime.get("prompt_debug"), root)
         debug.write_text("00_raw_input.txt", raw_prompt)
 
         intent = analyze_prompt(raw_prompt)
@@ -250,13 +255,13 @@ class DiaryRuntime:
                 "enabled": True,
                 "name": "short",
                 "reason": "short_input_expansion_risk matched",
-                "matched_style_hints": sorted(style_hints & HUMOR_PROFILE_STYLE_HINTS),
+                "matched_style_hints": sorted(style_hints & set(product_value('diary_runtime', 'HUMOR_PROFILE_STYLE_HINTS'))),
                 "matched_risk_tags": sorted(risk_tags & {"short_input_expansion_risk"}),
                 "overrides": overrides,
             }
             return runtime
 
-        if "humor_or_absurd_prompt" not in risk_tags and not (style_hints & HUMOR_PROFILE_STYLE_HINTS):
+        if "humor_or_absurd_prompt" not in risk_tags and not (style_hints & set(product_value('diary_runtime', 'HUMOR_PROFILE_STYLE_HINTS'))):
             runtime["_generation_profile"] = {"enabled": True, "name": "default", "reason": "no style profile matched"}
             return runtime
 
@@ -273,7 +278,7 @@ class DiaryRuntime:
             "enabled": True,
             "name": "humor",
             "reason": "humor_or_absurd_prompt/style_hints matched",
-            "matched_style_hints": sorted(style_hints & HUMOR_PROFILE_STYLE_HINTS),
+            "matched_style_hints": sorted(style_hints & set(product_value('diary_runtime', 'HUMOR_PROFILE_STYLE_HINTS'))),
             "matched_risk_tags": sorted(risk_tags & {"humor_or_absurd_prompt"}),
             "overrides": overrides,
         }
@@ -338,34 +343,34 @@ class DiaryRuntime:
                 previous_draft.strip(),
                 "",
                 "[GUARD_FAILURE]",
-                "失败原因：",
+                product_wording('diary_runtime', 'build_retry_messages', 0),
                 _format_bullets(guard_data.get("reasons") or []),
-                f"命中禁区词：{_format_forbidden_hits(guard_data.get('forbidden_hits') or [])}",
-                f"缺失主题词：{_format_inline_list(guard_data.get('missing_topic_terms') or [])}",
-                f"格式问题：{_format_inline_list(guard_data.get('format_hits') or [])}",
-                f"语言噪声：{_format_inline_list(guard_data.get('language_noise_hits') or [])}",
-                f"质量警告：{_format_inline_list(guard_data.get('warnings') or guard_data.get('quality_warnings') or [])}",
+                f"{product_wording('diary_runtime', 'build_retry_messages', 1)}{_format_forbidden_hits(guard_data.get('forbidden_hits') or [])}",
+                f"{product_wording('diary_runtime', 'build_retry_messages', 2)}{_format_inline_list(guard_data.get('missing_topic_terms') or [])}",
+                f"{product_wording('diary_runtime', 'build_retry_messages', 3)}{_format_inline_list(guard_data.get('format_hits') or [])}",
+                f"{product_wording('diary_runtime', 'build_retry_messages', 4)}{_format_inline_list(guard_data.get('language_noise_hits') or [])}",
+                f"{product_wording('diary_runtime', 'build_retry_messages', 5)}{_format_inline_list(guard_data.get('warnings') or guard_data.get('quality_warnings') or [])}",
                 "",
                 "[REWRITE_TASK]",
-                "请重写为一篇新的日记正文。",
-                "必须围绕 MAIN_TOPIC 和 TOPIC_TERMS。",
-                "删除所有禁区内容、格式漂移和语言噪声。",
-                "不要解释，不要列点，不要输出标题，不要 Markdown。",
+                product_wording('diary_runtime', 'build_retry_messages', 6),
+                product_wording('diary_runtime', 'build_retry_messages', 7),
+                product_wording('diary_runtime', 'build_retry_messages', 8),
+                product_wording('diary_runtime', 'build_retry_messages', 9),
                 "",
                 "[REWRITE_STYLE_REQUIREMENT]",
-                "重写时不要只复述 MAIN_TOPIC；请保留主旨，同时在主旨范围内补充 1-2 个具体动作、内心吐槽或小对话。",
-                "允许的合理展开：现场动作、内心 OS、一句对话、轻微夸张比喻、与主题直接相关的小后果。",
-                "不允许的展开：跳到股票/算法/考试/旧聊天/旧人物长故事/未授权地点，或从当前 prompt 扩成完全无关的历史回忆。",
-                "如果原 prompt 有搞笑、难蚌、离谱、吐槽感，重写后必须保留笑点锐度；不要升华成大道理，不要写成总结报告。",
-                "如果 Guard 提示 generic/repetition/too_short/low_detail，就补一个贴题动作、一个感官细节或一句脑内 OS，而不是单纯缩短或复读主题。",
-                "如果有 MISSING_FACTS_FALLBACK_POLICY，按其中规则写：允许模糊贴题小想象，禁止未授权硬事实和旧人物长故事。",
-                "对缺失主题词要自然补回，不能只写泛泛的自由、努力、生活感受。",
+                product_wording('diary_runtime', 'build_retry_messages', 10),
+                product_wording('diary_runtime', 'build_retry_messages', 11),
+                product_wording('diary_runtime', 'build_retry_messages', 12),
+                product_wording('diary_runtime', 'build_retry_messages', 13),
+                product_wording('diary_runtime', 'build_retry_messages', 14),
+                product_wording('diary_runtime', 'build_retry_messages', 15),
+                product_wording('diary_runtime', 'build_retry_messages', 16),
             ]
         )
         return [
             {
                 "role": "system",
-                "content": "你是一个私人日记重写助手。只输出修订后的单篇日记正文，不做安全审核，不解释。",
+                "content": product_wording('diary_runtime', 'build_retry_messages', 17),
             },
             {"role": "user", "content": user_content},
         ]
@@ -442,13 +447,17 @@ class DiaryRuntime:
 
         prompt_debug_override = kwargs.pop("prompt_debug", None)
         prompt_debug_output_dir = kwargs.pop("prompt_debug_output_dir", None)
+        for key in ("asset_root", "product_content"):
+            if key in kwargs:
+                raise ValueError(f"Cannot override {key} for a single request")
         runtime.update(kwargs)
-        prompt_debug_config = normalize_prompt_debug_config(runtime.get("prompt_debug"))
+        root = Path(runtime["asset_root"]) if runtime.get("asset_root") else None
+        prompt_debug_config = normalize_prompt_debug_config(runtime.get("prompt_debug"), root)
         if prompt_debug_override is not None:
             prompt_debug_config["enabled"] = bool(prompt_debug_override)
         if prompt_debug_output_dir is not None:
             prompt_debug_config["output_dir"] = prompt_debug_output_dir
-        runtime["prompt_debug"] = normalize_prompt_debug_config(prompt_debug_config)
+        runtime["prompt_debug"] = normalize_prompt_debug_config(prompt_debug_config, root)
         runtime.setdefault("stop_sequences", [])
         runtime.setdefault("use_chat_template", True)
         runtime.setdefault("guard", {})
@@ -543,7 +552,7 @@ class _FakeTokenizer:
         return _FakeBatch({"input_ids": torch.ones((len(texts), max_len), dtype=torch.long)})
 
     def batch_decode(self, sequences, skip_special_tokens=True):
-        return ["今天和朋友吃饭，确实挺开心的。那种开心不是很夸张，就是回来的路上还会觉得今天没白过。\n--- 后面应该被截断"]
+        return ["The fictional observatory dome opened and the telescope lens fogged."]
 
 
 class _FakeModel:
@@ -553,39 +562,23 @@ class _FakeModel:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="DiaryRuntime fake-model smoke test")
-    parser.add_argument("--prompt", default="今天和朋友吃饭，很开心")
-    parser.add_argument("--prompt-debug", action="store_true")
-    parser.add_argument("--prompt-debug-output-dir", default="debug/prompt")
-    args = parser.parse_args()
+    from diary_core.config.assets import build_or_exit
+    from diary_core.config.common import dump_runtime_config
+    from diary_core.config.infer_config import build_batch_parser, build_batch_runtime_config, inference_summary
+    from diary_core.infer.prompt_io import load_prompts
 
-    runtime_config = {
-        "device": "cpu",
-        "max_new_tokens": 32,
-        "temperature": 0.7,
-        "top_p": 0.9,
-        "top_k": 40,
-        "repetition_penalty": 1.08,
-        "num_beams": 1,
-        "stop_sequences": ["\n---"],
-        "use_chat_template": True,
-        "prompt_debug": {
-            "enabled": args.prompt_debug,
-            "output_dir": args.prompt_debug_output_dir,
-            "include_rendered_prompt": True,
-            "include_messages": True,
-            "include_model_output": True,
-        },
-    }
-    profile_path = PROJECT_ROOT / "config" / "diary_profile.yaml"
-    if profile_path.exists():
-        runtime_config["diary_profile"] = {
-            "enabled": True,
-            "profile_path": str(profile_path),
-            "profile": load_yaml_config(profile_path, "config/diary_profile.yaml"),
-        }
-    result = DiaryRuntime(runtime_config, _FakeTokenizer(), _FakeModel()).generate(args.prompt)
-    print(json.dumps({"final_text": result.final_text, "debug_dir": result.debug_dir}, ensure_ascii=False, indent=2))
+    parser = build_batch_parser()
+    args = parser.parse_args()
+    runtime = build_or_exit(parser, build_batch_runtime_config, args)
+    if args.dry_run:
+        print(dump_runtime_config(inference_summary(runtime)))
+        return
+    prompts = load_prompts(runtime["input_file"])
+    if not prompts:
+        parser.error("The prompt input is empty")
+    runtime.update(device="cpu", max_new_tokens=8)
+    result = DiaryRuntime(runtime, _FakeTokenizer(), _FakeModel()).generate(prompts[0])
+    print(dump_runtime_config({"count": 1, "debug_dir": result.debug_dir}))
 
 
 if __name__ == "__main__":

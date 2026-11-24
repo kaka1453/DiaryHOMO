@@ -5,8 +5,10 @@ from pathlib import Path
 from typing import Any
 
 from lm_trainer.config.common import (
+    asset_path,
     dump_runtime_config,
     load_yaml_config,
+    open_asset_root,
     require_keys,
     str2bool,
 )
@@ -198,24 +200,47 @@ def parse_target_modules(value: Any) -> list[str]:
     return modules
 
 
+class TrainArgumentParser(argparse.ArgumentParser):
+    def __init__(self, default_train, default_model):
+        super().__init__(description="LoRA causal language model training")
+        self.config_defaults = {"config": default_train, "model_config": default_model}
+
+    def parse_args(self, args=None, namespace=None):
+        parsed = super().parse_args(args, namespace)
+        if parsed.asset_root is not None:
+            return parsed
+        if parsed.external_base_model is not None:
+            self.error("--external-base-model requires --asset-root")
+        missing = []
+        for field, default in self.config_defaults.items():
+            if getattr(parsed, field) is None:
+                setattr(parsed, field, default)
+                if default is None:
+                    missing.append("--" + field.replace("_", "-"))
+        if missing:
+            self.error("the following arguments are required: " + ", ".join(missing))
+        return parsed
+
+
 def build_train_parser(
     default_train=None, default_model=None
 ) -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="LoRA causal language model training")
+    parser = TrainArgumentParser(default_train, default_model)
+    parser.add_argument(
+        "--asset-root",
+        help="Use this asset directory. Defaults to config/train.yaml and config/model.yaml within it.",
+    )
     parser.add_argument(
         "--config",
-        type=str,
-        default=default_train,
-        required=default_train is None,
-        help="Training YAML config file path.",
+        help="Training YAML path. Required unless using an asset root or an entry point with a default.",
     )
     parser.add_argument(
         "--model-config",
-        dest="model_config",
-        type=str,
-        default=default_model,
-        required=default_model is None,
-        help="Model YAML config file path.",
+        help="Model YAML path. Required unless using an asset root or an entry point with a default.",
+    )
+    parser.add_argument(
+        "--external-base-model",
+        help="Absolute path to a shared local model directory in asset-root mode.",
     )
     for flag, dest, value_type, help_text in CLI_OVERRIDE_SPECS:
         parser.add_argument(
@@ -243,10 +268,14 @@ def collect_config_values(
 
 
 def apply_runtime_casts(runtime: dict[str, Any], path_root: Path) -> None:
-    for key, default in OPTIONAL_DEFAULTS.items():
-        runtime.setdefault(key, default)
     for field in PATH_FIELDS:
         runtime[field] = str((path_root / Path(runtime[field]).expanduser()).resolve())
+    cast_runtime_values(runtime)
+
+
+def cast_runtime_values(runtime: dict[str, Any]) -> None:
+    for key, default in OPTIONAL_DEFAULTS.items():
+        runtime.setdefault(key, default)
     for field in INT_FIELDS:
         runtime[field] = int(runtime[field])
     for field in FLOAT_FIELDS:
@@ -302,13 +331,81 @@ def apply_cli_overrides(runtime: dict[str, Any], args: argparse.Namespace) -> No
     runtime.update(cli_overrides)
 
 
+def resolve_asset_runtime_paths(
+    runtime: dict[str, Any],
+    root: Path,
+    *,
+    eval_file: str | None,
+    external_model: str | None,
+    dry_run: bool,
+) -> None:
+    data = asset_path(root, runtime["data_file_path"], "data_file_path", "data/train")
+    # The dataset loader interprets these characters as glob patterns.
+    if any(pattern in str(data) for pattern in ("*", "?", "[", "::")):
+        raise ValueError(
+            f"data_file_path: {runtime['data_file_path']!r} must be a literal dataset path"
+        )
+    runtime["data_file_path"] = str(data)
+    if eval_file is not None:
+        runtime["eval_file_path"] = str(
+            asset_path(root, eval_file, "eval_file_path", "data/eval")
+        )
+
+    field = "model_name_or_path"
+    if external_model is None:
+        model = asset_path(
+            root, runtime[field], field, "assets", directory=True, required=not dry_run
+        )
+    else:
+        model = Path(external_model)
+        if not model.is_absolute() or not model.is_dir():
+            raise ValueError(
+                "--external-base-model must name an existing absolute model directory"
+            )
+        model = model.resolve(strict=True)
+    runtime[field] = str(model)
+
+    field = "checkpoint_dir"
+    output = asset_path(
+        root,
+        runtime[field],
+        field,
+        "checkpoints",
+        "runs",
+        directory=True,
+        required=False,
+    )
+    # The trainer also writes files and caches beneath this directory.
+    pending = [output] if output.is_dir() else []
+    while pending:
+        for child in pending.pop().iterdir():
+            if child.is_symlink():
+                raise ValueError(
+                    f"{field}: output contains symlink {str(child.relative_to(root))!r}"
+                )
+            if child.is_dir():
+                pending.append(child)
+    runtime[field] = str(output)
+
+
 def build_train_runtime_config(
     args: argparse.Namespace, *, path_root: Path | None = None
 ) -> dict[str, Any]:
-    train_config_path = Path(args.config).expanduser().resolve()
-    model_config_path = Path(args.model_config).expanduser().resolve()
-    train_cfg = load_yaml_config(train_config_path, "config/train.yaml")
-    model_cfg = load_yaml_config(model_config_path, "config/model.yaml")
+    asset_root = getattr(args, "asset_root", None)
+    root = None if asset_root is None else open_asset_root(asset_root)
+    if root is None:
+        train_config_path = Path(args.config).expanduser().resolve()
+        model_config_path = Path(args.model_config).expanduser().resolve()
+        train_label, model_label = "config/train.yaml", "config/model.yaml"
+    else:
+        train_label = "config/train.yaml" if args.config is None else args.config
+        model_label = (
+            "config/model.yaml" if args.model_config is None else args.model_config
+        )
+        train_config_path = asset_path(root, train_label, "--config", "config")
+        model_config_path = asset_path(root, model_label, "--model-config", "config")
+    train_cfg = load_yaml_config(train_config_path, train_label)
+    model_cfg = load_yaml_config(model_config_path, model_label)
 
     runtime = collect_config_values(train_cfg, TRAIN_CONFIG_FIELDS)
     runtime.update(collect_config_values(model_cfg, MODEL_CONFIG_FIELDS))
@@ -321,10 +418,29 @@ def build_train_runtime_config(
         )
 
     apply_cli_overrides(runtime, args)
-    require_keys(runtime, TRAIN_CONFIG_FIELDS + MODEL_CONFIG_FIELDS, "train/model")
-    apply_runtime_casts(
-        runtime, path_root if path_root is not None else train_config_path.parent
-    )
+    if root is None:
+        require_keys(runtime, TRAIN_CONFIG_FIELDS + MODEL_CONFIG_FIELDS, "train/model")
+        apply_runtime_casts(
+            runtime, path_root if path_root is not None else train_config_path.parent
+        )
+    else:
+        external_model = getattr(args, "external_base_model", None)
+        if external_model is not None:
+            if getattr(args, "model_name_or_path", None) is not None:
+                raise ValueError(
+                    "Choose either --model-name-or-path or --external-base-model"
+                )
+            runtime["model_name_or_path"] = external_model
+        require_keys(runtime, TRAIN_CONFIG_FIELDS, train_label)
+        require_keys(runtime, MODEL_CONFIG_FIELDS, model_label)
+        resolve_asset_runtime_paths(
+            runtime,
+            root,
+            eval_file=train_cfg.get("eval_file_path"),
+            external_model=external_model,
+            dry_run=getattr(args, "dry_run", False),
+        )
+        cast_runtime_values(runtime)
     validate_runtime_values(runtime)
     runtime["train_config_path"] = train_config_path
     runtime["model_config_path"] = model_config_path

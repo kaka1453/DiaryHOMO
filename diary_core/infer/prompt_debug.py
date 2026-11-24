@@ -5,19 +5,20 @@ import json
 from pathlib import Path
 import uuid
 
-from diary_core.config.common import resolve_path, str2bool
+from diary_core.config.assets import runtime_output
+from diary_core.config.common import str2bool
 
 
 DEFAULT_PROMPT_DEBUG_CONFIG = {
     "enabled": False,
-    "output_dir": "debug/prompt",
+    "output_dir": None,
     "include_rendered_prompt": True,
     "include_messages": True,
     "include_model_output": True,
 }
 
 
-def normalize_prompt_debug_config(config: dict | None) -> dict:
+def normalize_prompt_debug_config(config: dict | None, root: Path | None = None) -> dict:
     normalized = dict(DEFAULT_PROMPT_DEBUG_CONFIG)
     if isinstance(config, dict):
         normalized.update(config)
@@ -25,13 +26,18 @@ def normalize_prompt_debug_config(config: dict | None) -> dict:
     normalized["include_rendered_prompt"] = str2bool(normalized.get("include_rendered_prompt", True))
     normalized["include_messages"] = str2bool(normalized.get("include_messages", True))
     normalized["include_model_output"] = str2bool(normalized.get("include_model_output", True))
-    normalized["output_dir"] = str(resolve_path(normalized.get("output_dir") or "debug/prompt"))
+    location = normalized["output_dir"]
+    if root is not None:
+        location = runtime_output(root, location or "runs/debug/prompt", directory=True)
+    elif normalized["enabled"] and (not location or not Path(location).is_absolute()):
+        raise ValueError("Prompt debug requires an absolute output directory or an asset root")
+    normalized["output_dir"] = str(location) if location else None
     return normalized
 
 
 class PromptDebugRun:
-    def __init__(self, config: dict | None):
-        self.config = normalize_prompt_debug_config(config)
+    def __init__(self, config: dict | None, root: Path | None = None):
+        self.config = normalize_prompt_debug_config(config, root)
         self.enabled = self.config["enabled"]
         self.run_dir: Path | None = None
         if self.enabled:

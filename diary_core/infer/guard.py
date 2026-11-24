@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from diary_core.infer.product_content import product_value, product_wording
+
 import argparse
 from dataclasses import asdict, dataclass
 import json
@@ -13,221 +15,10 @@ from diary_core.infer.prompt_contract import DiaryContract, build_contract
 GuardDecision = Literal["pass", "pass_with_warnings", "revise", "fail"]
 
 
-DEFAULT_GUARD_CONFIG: dict[str, Any] = {
-    "enabled": True,
-    "max_retry": 1,
-    "retry_on_revise": True,
-    "retry_on_warnings": False,
-    "pass_with_warnings": True,
-    "fail_strategy": "best_attempt",
-    "thresholds": {
-        "min_final_score": 75,
-        "min_topic_score": 55,
-        "min_drift_score": 85,
-        "min_format_score": 85,
-        "min_language_score": 75,
-        "min_quality_score": 60,
-    },
-    "extra_forbidden_terms": [
-        "yyj",
-        "b计算机",
-        "冰激凌",
-        "浩海钓具",
-        "钓鱼用品店",
-        "反向伞",
-        "大明瑾",
-        "圣地",
-        "分校区",
-        "旧人物档案",
-        "过去的聊天",
-        "聊天记录",
-        "顾问",
-        "虚无妹妹",
-        "b政治",
-        "数学课",
-        "高中作业",
-        "晚自习",
-        "课程预习",
-    ],
-    "severity": {
-        "high": [
-            "股票",
-            "期权",
-            "算法",
-            "代码",
-            "考试",
-            "NUS",
-            "实验室",
-            "旧聊天记录",
-            "链接",
-            "Markdown 表格",
-            "日语假名",
-            "英文长串",
-            "外部链接",
-            "http",
-            "https",
-            "YouTube",
-            "youtube",
-            "B站",
-            "GitHub",
-            "虚无妹妹",
-            "b政治",
-        ],
-        "medium": [
-            "作业",
-            "复习",
-            "课程",
-            "AirPods",
-            "Genshin",
-            "雅思",
-            "CET6",
-            "高数",
-            "线性代数",
-            "yyj",
-            "b计算机",
-            "冰激凌",
-            "钓鱼用品店",
-            "浩海钓具",
-            "反向伞",
-        ],
-    },
-    "term_aliases": {
-        "宿舍": ["寝室"],
-        "被迫围观": ["围观", "吸引出来", "出来看"],
-        "和朋友吃饭": ["朋友们一起吃", "朋友们聚餐", "和朋友们一起吃"],
-        "朋友": ["朋友们"],
-        "考研": ["备考", "上岸"],
-        "复习": ["刷题", "做题", "学习"],
-        "调侃": ["吐槽", "难蚌"],
-        "反抗": ["对抗"],
-        "黑纸运动": ["黑纸"],
-        "起义": ["抗议", "行动"],
-        "cat": ["邪恶表妹", "表妹"],
-        "邪恶表妹": ["cat", "表妹"],
-    },
-    "quality": {
-        "enabled": True,
-        "min_quality_score": 60,
-        "min_length_by_type": {
-            "keyword": 40,
-            "short_daily": 50,
-            "question": 50,
-            "opening": 90,
-            "instruction": 120,
-            "style_instruction": 120,
-            "simulation_instruction": 120,
-        },
-        "max_prompt_copy_ratio": 0.45,
-        "generic_template_penalty": True,
-        "repetition_penalty_enabled": True,
-        "require_scene_for_humor": True,
-        "generic_template_terms": [
-            "总的来说",
-            "这种体验让我",
-            "这让我意识到",
-            "这是一种",
-            "也许这就是生活",
-            "成为了共同的记忆",
-            "我会继续努力",
-            "明天会更好",
-            "就记录到这里",
-            "今天的日记到这里",
-            "每个人都有自己的生活",
-            "这是值得我学习的",
-            "生活中的小确幸",
-            "迎接明天",
-            "按部就班",
-        ],
-        "old_memory_risk_terms": [
-            "cat弟妹",
-            "弟妹",
-            "武汉",
-            "双休日",
-            "小时候",
-            "以前",
-            "过去",
-            "回家",
-            "家里人",
-            "同学",
-            "学校",
-            "图书馆",
-            "实验室",
-            "数学课",
-            "作业",
-            "复习",
-            "b政治",
-            "虚无妹妹",
-        ],
-        "scene_terms": [
-            "看到",
-            "听到",
-            "走",
-            "坐",
-            "拿",
-            "打开",
-            "关上",
-            "回到",
-            "桌",
-            "床",
-            "门",
-            "宿舍",
-            "寝室",
-            "图书馆",
-            "餐厅",
-            "书房",
-            "笑",
-            "问",
-            "说",
-            "递",
-            "看着",
-            "闻到",
-        ],
-        "humor_scene_terms": [
-            "吐槽",
-            "OS",
-            "脑子",
-            "难蚌",
-            "蚌",
-            "寄",
-            "草",
-            "笑",
-            "离谱",
-            "破防",
-            "当场",
-            "邪恶",
-            "恼",
-        ],
-    },
-    "audit": {
-        "include_guard_table": True,
-        "include_warnings": True,
-        "mode": "html_comment",
-    },
-}
-
-STYLE_OR_GENERIC_TERMS = {
-    "搞笑",
-    "幽默",
-    "吐槽",
-    "反差",
-    "场景化",
-    "真实",
-    "可爱",
-    "无奈",
-    "轻松",
-    "严肃",
-    "哲理",
-    "日常",
-    "今天",
-    "正文",
-}
-
 TRADITIONAL_CHARS = set(
     "學習體驗關係個這樣說話還會沒為與對時後點裡讓過來麼"
     "氣實現發現問題應該準備複雜總結開始"
 )
-
-HUMOR_HINTS = {"搞笑", "幽默", "吐槽", "荒诞", "离谱", "难蚌", "戏剧化", "自嘲", "反差", "段子", "夸张", "破防", "场景化"}
 
 
 @dataclass
@@ -353,7 +144,8 @@ def guard_diary(text: str, contract: DiaryContract, config: dict | None = None) 
 
 
 def normalize_guard_config(config: dict | None = None) -> dict:
-    normalized = deep_merge_dict(DEFAULT_GUARD_CONFIG, config or {})
+    defaults = product_value('guard', 'DEFAULT_GUARD_CONFIG')
+    normalized = deep_merge_dict(defaults, config or {})
     normalized["enabled"] = _as_bool(normalized.get("enabled", True))
     normalized["max_retry"] = int(normalized.get("max_retry", 1))
     normalized["retry_on_revise"] = _as_bool(normalized.get("retry_on_revise", True))
@@ -361,15 +153,15 @@ def normalize_guard_config(config: dict | None = None) -> dict:
     normalized["pass_with_warnings"] = _as_bool(normalized.get("pass_with_warnings", True))
     normalized["fail_strategy"] = str(normalized.get("fail_strategy") or "best_attempt")
 
-    thresholds = deep_merge_dict(DEFAULT_GUARD_CONFIG["thresholds"], normalized.get("thresholds") or {})
-    for key in list(DEFAULT_GUARD_CONFIG["thresholds"]):
+    thresholds = deep_merge_dict(defaults["thresholds"], normalized.get("thresholds") or {})
+    for key in list(defaults["thresholds"]):
         if key in normalized and normalized.get(key) is not None:
             thresholds[key] = normalized[key]
-        normalized[key] = float(thresholds.get(key, DEFAULT_GUARD_CONFIG["thresholds"][key]))
+        normalized[key] = float(thresholds.get(key, defaults["thresholds"][key]))
         thresholds[key] = normalized[key]
     normalized["thresholds"] = thresholds
 
-    quality = deep_merge_dict(DEFAULT_GUARD_CONFIG["quality"], normalized.get("quality") or {})
+    quality = deep_merge_dict(defaults["quality"], normalized.get("quality") or {})
     quality["enabled"] = _as_bool(quality.get("enabled", True))
     quality["generic_template_penalty"] = _as_bool(quality.get("generic_template_penalty", True))
     quality["repetition_penalty_enabled"] = _as_bool(quality.get("repetition_penalty_enabled", True))
@@ -392,7 +184,7 @@ def normalize_guard_config(config: dict | None = None) -> dict:
     }
     normalized["extra_forbidden_terms"] = normalize_string_list(normalized.get("extra_forbidden_terms"))
     normalized["term_aliases"] = normalize_aliases(normalized.get("term_aliases"))
-    audit = deep_merge_dict(DEFAULT_GUARD_CONFIG["audit"], normalized.get("audit") or {})
+    audit = deep_merge_dict(defaults["audit"], normalized.get("audit") or {})
     audit["include_guard_table"] = _as_bool(audit.get("include_guard_table", True))
     audit["include_warnings"] = _as_bool(audit.get("include_warnings", True))
     normalized["audit"] = audit
@@ -709,28 +501,28 @@ def build_revision_instruction(
     important_terms = important_topic_terms(contract)
     required_n = min(3, max(1, len(important_terms)))
     lines = [
-        "请重写为一篇新的日记正文。",
-        f"必须围绕 MAIN_TOPIC：{contract.main_topic}",
-        f"必须自然出现以下主题锚点中的至少 {required_n} 个：{', '.join(important_terms[:8]) or '本次主题'}",
-        "允许围绕 MAIN_TOPIC 做主旨内的合理想象展开：补现场动作、内心 OS、一句小对话、轻微夸张比喻或直接相关的小后果。",
-        "不允许跳到股票/算法/考试/旧聊天/旧人物长故事/未授权地点，也不要从当前 prompt 扩成完全无关的历史回忆。",
-        "删除所有禁区内容，不要解释，不要列点，不要输出标题。",
-        "不要只复述 MAIN_TOPIC，不要升华成大道理，不要写成总结报告。",
+        product_wording('guard', 'build_revision_instruction', 0),
+        f"{product_wording('guard', 'build_revision_instruction', 1)}{contract.main_topic}",
+        f"{product_wording('guard', 'build_revision_instruction', 2)}{required_n}{product_wording('guard', 'build_revision_instruction', 3)}{', '.join(important_terms[:8]) or product_wording('guard', 'build_revision_instruction', 4)}",
+        product_wording('guard', 'build_revision_instruction', 5),
+        product_wording('guard', 'build_revision_instruction', 6),
+        product_wording('guard', 'build_revision_instruction', 7),
+        product_wording('guard', 'build_revision_instruction', 8),
     ]
     if is_humor_contract(contract):
-        lines.append("如果原 prompt 有搞笑/难蚌/离谱/吐槽感，重写后必须保留笑点锐度和场景感。")
+        lines.append(product_wording('guard', 'build_revision_instruction', 9))
     if reasons:
-        lines.append(f"失败原因：{'；'.join(reasons)}")
+        lines.append(f"{product_wording('guard', 'build_revision_instruction', 10)}{'；'.join(reasons)}")
     if forbidden_terms:
-        lines.append(f"需要删除的禁区词：{', '.join(forbidden_terms[:12])}")
+        lines.append(f"{product_wording('guard', 'build_revision_instruction', 11)}{', '.join(forbidden_terms[:12])}")
     if missing_topic_terms:
-        lines.append(f"需要补回的主题词：{', '.join(missing_topic_terms[:8])}")
+        lines.append(f"{product_wording('guard', 'build_revision_instruction', 12)}{', '.join(missing_topic_terms[:8])}")
     if format_hits:
-        lines.append(f"需要移除的格式问题：{', '.join(format_hits)}")
+        lines.append(f"{product_wording('guard', 'build_revision_instruction', 13)}{', '.join(format_hits)}")
     if language_noise_hits:
-        lines.append(f"需要移除的语言噪声：{', '.join(language_noise_hits)}")
+        lines.append(f"{product_wording('guard', 'build_revision_instruction', 14)}{', '.join(language_noise_hits)}")
     if quality_warnings:
-        lines.append(f"需要改善的质量问题：{', '.join(quality_warnings[:8])}")
+        lines.append(f"{product_wording('guard', 'build_revision_instruction', 15)}{', '.join(quality_warnings[:8])}")
     return "\n".join(lines)
 
 
@@ -755,7 +547,7 @@ def clean_term(term: str) -> str:
 
 
 def is_important_topic_term(term: str) -> bool:
-    if not term or term in STYLE_OR_GENERIC_TERMS:
+    if not term or term in set(product_value('guard', 'STYLE_OR_GENERIC_TERMS')):
         return False
     if len(term) > 24:
         return False
@@ -767,9 +559,9 @@ def is_important_topic_term(term: str) -> bool:
 def is_searchable_forbidden_term(term: str) -> bool:
     if not term or len(term) > 24:
         return False
-    if term in {"Markdown 表格", "代码块", "外部链接", "英文长串", "日语假名"}:
+    if term in {product_wording('guard', 'is_searchable_forbidden_term', 0), product_wording('guard', 'is_searchable_forbidden_term', 1), product_wording('guard', 'is_searchable_forbidden_term', 2), product_wording('guard', 'is_searchable_forbidden_term', 3), product_wording('guard', 'is_searchable_forbidden_term', 4)}:
         return True
-    return not term.startswith(("未授权", "混杂"))
+    return not term.startswith((product_wording('guard', 'is_searchable_forbidden_term', 5), product_wording('guard', 'is_searchable_forbidden_term', 6)))
 
 
 def severity_for_term(term: str, config: dict) -> str:
@@ -854,7 +646,7 @@ def detect_repetition_warning(text: str, contract: DiaryContract) -> str:
 def is_humor_contract(contract: DiaryContract) -> bool:
     styles = set(getattr(contract, "style_hints", []) or [])
     risks = set(getattr(contract, "risk_tags", []) or [])
-    return bool(styles & HUMOR_HINTS or "humor_or_absurd_prompt" in risks)
+    return bool(styles & set(product_value('guard', 'HUMOR_HINTS')) or "humor_or_absurd_prompt" in risks)
 
 
 def unexpected_english_tokens(text: str, contract: DiaryContract) -> list[str]:
@@ -1010,44 +802,7 @@ def _fmt_score(value) -> str:
 
 
 def _smoke_cases() -> list[dict]:
-    return [
-        {
-            "name": "normal_pass",
-            "prompt": "山东深夜在宿舍开启红烧肉和葱油饼制作模式，结果全寝室在醋香中被迫围观。",
-            "text": "山东晚上在宿舍做红烧肉和葱油饼，醋香直接铺满了整个寝室。大家被迫围观，我脑子里只有一句：这锅怕不是酸菜鱼副本。",
-            "expect": {"pass", "pass_with_warnings"},
-        },
-        {
-            "name": "drift_revise",
-            "prompt": "今天和朋友吃饭，很开心。",
-            "text": "今天吃饭之后我开始研究股票和算法，顺便复习了高数作业。",
-            "expect": {"revise", "fail"},
-        },
-        {
-            "name": "format_revise",
-            "prompt": "今天和朋友吃饭，很开心。",
-            "text": "# 标题\n\n| 项目 | 内容 |\n| --- | --- |\n| 吃饭 | 开心 |",
-            "expect": {"revise", "fail"},
-        },
-        {
-            "name": "language_revise",
-            "prompt": "今天和朋友吃饭，很开心。",
-            "text": "今天和朋友吃饭很开心。これはテストです。abcdefghijklmnopqrstuvwxyzabcdefg",
-            "expect": {"revise", "fail"},
-        },
-        {
-            "name": "short_drift_revise",
-            "prompt": "cat",
-            "text": "今天去图书馆复习高数和线性代数，顺便写了作业。",
-            "expect": {"revise", "fail"},
-        },
-        {
-            "name": "quality_warning",
-            "prompt": "山东深夜在宿舍开启红烧肉和葱油饼制作模式，结果全寝室在醋香中被迫围观。",
-            "text": "山东深夜在宿舍开启红烧肉和葱油饼制作模式，结果全寝室在醋香中被迫围观。这让我意识到生活很有趣。",
-            "expect": {"pass_with_warnings", "revise"},
-        },
-    ]
+    return product_value('guard', "SMOKE_CASES")
 
 
 def run_smoke_cases() -> None:
@@ -1065,14 +820,24 @@ def run_smoke_cases() -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="DiaryGuard rule smoke test and debug summarizer")
-    parser.add_argument("--summarize-debug", dest="summarize_debug", default=None)
-    parser.add_argument("--output-jsonl", dest="output_jsonl", default=None)
+    from diary_core.config.assets import add_asset_root, product_root
+    from diary_core.infer.product_content import load_product_content, using_product_content
+    from lm_trainer.config.common import asset_path
+
+    parser = argparse.ArgumentParser(description="Validate a guard debug run or run the configured probes")
+    add_asset_root(parser)
+    parser.add_argument("--debug-dir", help="Debug run path relative to the asset root")
     args = parser.parse_args()
-    if args.summarize_debug:
-        summarize_debug(args.summarize_debug, args.output_jsonl)
-        return
-    run_smoke_cases()
+    root = product_root(args.asset_root)
+    with using_product_content(load_product_content(root)):
+        if args.debug_dir:
+            directory = asset_path(root, args.debug_dir, "--debug-dir", "runs", directory=True)
+            for name in ("00_raw_input.txt", "09_guard.json", "10_final_output.txt"):
+                asset_path(root, str(directory.relative_to(root) / name), "guard artifact", "runs", required=False)
+            summary = summarize_debug(directory)
+            print(json.dumps({"debug_dir": str(directory), "artifact_count": len(summary)}))
+        else:
+            print(json.dumps({"count": len(_smoke_cases())}))
 
 
 if __name__ == "__main__":

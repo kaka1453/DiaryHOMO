@@ -1,24 +1,28 @@
 from __future__ import annotations
 
-import argparse
+from pathlib import Path
 
-import gradio as gr
-
+from diary_core.config.assets import build_or_exit, configure_caches
 from diary_core.config.common import dump_runtime_config
 from diary_core.config.infer_config import (
     build_webui_parser,
     build_webui_runtime_config,
+    inference_summary,
 )
-from diary_core.webui.handlers import (
-    clear_conversation,
-    generate_handler,
-    load_model_handler,
-    unload_model_handler,
-)
-from diary_core.webui.state import Conversation, WebUIState
+from diary_core.infer.output_bundle import prepare_output_bundle, write_parameters
 
 
-def build_demo(state: WebUIState):
+def build_demo(state):
+    import gradio as gr
+
+    from diary_core.webui.handlers import (
+        clear_conversation,
+        generate_handler,
+        load_model_handler,
+        unload_model_handler,
+    )
+    from diary_core.webui.state import Conversation
+
     def respond(prompt, save_md, system, role, conversation):
         reply = generate_handler(
             state, prompt, save_md, system, role, session=conversation
@@ -110,19 +114,24 @@ def build_demo(state: WebUIState):
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="WebUI app smoke test")
-    parser.add_argument("--config", default=None)
-    parser.add_argument("--dry-run", action="store_true")
+    parser = build_webui_parser()
+    parser.add_argument("--init-only", action="store_true", help="Build the UI without launching a server.")
     args = parser.parse_args()
+    initialize = vars(args).pop("init_only")
+    runtime = build_or_exit(parser, build_webui_runtime_config, args)
+    if args.dry_run:
+        print(dump_runtime_config(inference_summary(runtime)))
+        return
+    configure_caches(Path(runtime["asset_root"]))
+    from diary_core.webui.state import WebUIState
 
-    argv = ["--dry-run"]
-    if args.config:
-        argv.extend(["--config", args.config])
-    runtime = build_webui_runtime_config(build_webui_parser().parse_args(argv))
-    state = WebUIState(runtime)
-    print(dump_runtime_config(runtime))
-    if not args.dry_run:
-        build_demo(state)
+    prepare_output_bundle(runtime)
+    write_parameters(runtime)
+    demo = build_demo(WebUIState(runtime))
+    if initialize:
+        print(dump_runtime_config(inference_summary(runtime)))
+        return
+    demo.launch(server_name=runtime["server_name"], server_port=runtime["server_port"], share=runtime["share"])
 
 
 if __name__ == "__main__":

@@ -2,8 +2,18 @@ import re
 import json
 import math
 
-input_file = "diary_boa.md"
-output_file = "diary_boa.jsonl"
+from pathlib import Path
+import sys
+
+sys.dont_write_bytecode = True
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+from diary_core.data.preprocess import preprocessing_paths
+
+input_file, output_file = preprocessing_paths(
+    source='data/raw/diary_boa.md',
+    target='data/train/diary_boa.jsonl',
+)
 MAX_LENGTH = 9999  # 可调，单位为字符
 AUTO_WRAP = "n"   # "y" 开启自动按句号换行, "n" 不启用
 

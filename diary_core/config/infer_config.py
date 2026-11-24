@@ -4,23 +4,21 @@ import argparse
 from pathlib import Path
 from typing import Any
 
-from diary_core.config.common import (
-    PROJECT_ROOT,
-    dump_runtime_config,
-    load_yaml_config,
-    require_keys,
-    resolve_path,
-    str2bool,
+from diary_core.config.assets import (
+    add_asset_root,
+    build_or_exit,
+    external_base_model,
+    load_product_config,
+    product_root,
 )
+from diary_core.config.common import dump_runtime_config, require_keys, str2bool
+from diary_core.infer.product_content import load_product_content
 from diary_core.infer.prompt_debug import normalize_prompt_debug_config
+from lm_trainer.config.common import asset_path
 
 
-DEFAULT_GENERATE_CONFIG_PATH = PROJECT_ROOT / "config" / "generate.yaml"
-DEFAULT_WEBUI_CONFIG_PATH = PROJECT_ROOT / "config" / "webui.yaml"
-DEFAULT_GUARD_CONFIG_PATH = PROJECT_ROOT / "config" / "guard.yaml"
-DEFAULT_DIARY_PROFILE_CONFIG_PATH = PROJECT_ROOT / "config" / "diary_profile.yaml"
-DEFAULT_OUTPUT_ROOT = "generate/output"
-DEFAULT_OUTPUT_NAME = "boa256日记"
+DEFAULT_OUTPUT_ROOT = "runs/generation"
+DEFAULT_OUTPUT_NAME = "diary"
 
 
 GENERATION_KEYS = [
@@ -46,9 +44,15 @@ def add_generation_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--prompt-debug-output-dir", dest="prompt_debug_output_dir", type=str, default=None)
 
 
+def add_config_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--config", help="YAML path relative to the asset root.")
+    parser.add_argument("--external-base-model", help="Absolute path to a shared local base model.")
+
+
 def build_batch_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="8bit HuggingFace batch generation")
-    parser.add_argument("--config", type=str, default=str(DEFAULT_GENERATE_CONFIG_PATH), help="YAML config file path.")
+    add_asset_root(parser)
+    add_config_args(parser)
     parser.add_argument("--model-name-or-path", dest="model_name_or_path", type=str, default=None)
     parser.add_argument("--checkpoint-dir", dest="checkpoint_dir", type=str, default=None)
     parser.add_argument("--input-file", dest="input_file", type=str, default=None)
@@ -66,7 +70,8 @@ def build_batch_parser() -> argparse.ArgumentParser:
 
 def build_webui_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="8bit HuggingFace WebUI")
-    parser.add_argument("--config", type=str, default=str(DEFAULT_WEBUI_CONFIG_PATH), help="YAML config file path.")
+    add_asset_root(parser)
+    add_config_args(parser)
     parser.add_argument("--model-name-or-path", dest="model_name_or_path", type=str, default=None)
     parser.add_argument("--checkpoint-dir", dest="checkpoint_dir", type=str, default=None)
     parser.add_argument("--device", dest="device", type=str, default=None)
@@ -114,41 +119,17 @@ def deep_merge_dict(base: dict[str, Any], overrides: dict[str, Any] | None) -> d
     return merged
 
 
-def load_guard_runtime_config(raw_config: dict[str, Any]) -> dict[str, Any]:
-    base = load_yaml_config(DEFAULT_GUARD_CONFIG_PATH, "config/guard.yaml")
-    return deep_merge_dict(base, raw_config.get("guard") or {})
-
-
-def load_audit_runtime_config(raw_config: dict[str, Any], guard_config: dict[str, Any]) -> dict[str, Any]:
-    base = guard_config.get("audit") if isinstance(guard_config.get("audit"), dict) else {}
-    return deep_merge_dict(base, raw_config.get("audit") or {})
-
-
-def load_diary_profile_runtime_config(raw_config: dict[str, Any]) -> dict[str, Any]:
-    config = deep_merge_dict(
-        {
-            "enabled": True,
-            "profile_path": str(DEFAULT_DIARY_PROFILE_CONFIG_PATH),
-        },
-        raw_config.get("diary_profile") or {},
-    )
-    config["enabled"] = str2bool(config.get("enabled", True))
-    profile_path = resolve_path(config.get("profile_path") or DEFAULT_DIARY_PROFILE_CONFIG_PATH)
-    config["profile_path"] = str(profile_path)
+def load_diary_profile_runtime_config(raw_config: dict[str, Any], root: Path) -> dict[str, Any]:
+    config = {"enabled": True, **(raw_config.get("diary_profile") or {})}
+    config["enabled"] = str2bool(config["enabled"])
     if config["enabled"]:
-        config["profile"] = load_yaml_config(profile_path, "config/diary_profile.yaml")
+        name = config.get("profile_path", "assets/persona/diary_profile.yaml")
+        path = asset_path(root, name, "diary_profile.profile_path", "assets/persona")
+        config["profile_path"] = str(path)
+        config["profile"] = load_product_config(path, "diary_profile.profile_path")
     else:
         config["profile"] = {}
     return config
-
-
-def apply_prompt_debug_overrides(runtime: dict[str, Any], args: argparse.Namespace) -> None:
-    prompt_debug = normalize_prompt_debug_config(runtime.get("prompt_debug"))
-    if getattr(args, "prompt_debug_enabled", None) is not None:
-        prompt_debug["enabled"] = bool(args.prompt_debug_enabled)
-    if getattr(args, "prompt_debug_output_dir", None):
-        prompt_debug["output_dir"] = str(resolve_path(args.prompt_debug_output_dir))
-    runtime["prompt_debug"] = normalize_prompt_debug_config(prompt_debug)
 
 
 def apply_cli_overrides(runtime: dict[str, Any], args: argparse.Namespace, excluded: set[str]) -> None:
@@ -160,146 +141,126 @@ def apply_cli_overrides(runtime: dict[str, Any], args: argparse.Namespace, exclu
     runtime.update(cli_overrides)
 
 
-def build_batch_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
-    config_path = Path(args.config).expanduser().resolve()
-    raw_config = load_yaml_config(config_path, "config/generate.yaml")
-    generation_cfg = raw_config.get("generation") or {}
-    guard_config = load_guard_runtime_config(raw_config)
-
+def build_runtime_config(args: argparse.Namespace, kind: str, *, evaluation: bool = False) -> dict[str, Any]:
+    root = product_root(args.asset_root)
+    config_path = asset_path(root, args.config or f"config/{kind}.yaml", "--config", "config")
+    raw = load_product_config(config_path, "--config")
+    generation = raw.get("generation") or {}
+    guard_path = asset_path(root, raw.get("guard_path", "assets/guard/guard.yaml"), "guard_path", "assets/guard")
+    guard = deep_merge_dict(load_product_config(guard_path, "guard_path"), raw.get("guard"))
+    base_audit = guard.get("audit") if isinstance(guard.get("audit"), dict) else {}
+    webui = kind == "webui"
+    fields = ["model_name_or_path", "checkpoint_dir", "device"]
+    fields.extend(["save_md", "server_name", "server_port", "share"] if webui else ["input_file", "batch_size"])
     runtime = {
-        "model_name_or_path": raw_config.get("model_name_or_path"),
-        "checkpoint_dir": raw_config.get("checkpoint_dir"),
-        "input_file": raw_config.get("input_file"),
-        "output_file": raw_config.get("output_file"),
-        "output_root": raw_config.get("output_root", DEFAULT_OUTPUT_ROOT),
-        "output_name": raw_config.get("output_name", DEFAULT_OUTPUT_NAME),
-        "device": raw_config.get("device"),
-        "batch_size": raw_config.get("batch_size"),
-        "print_prompts": raw_config.get("print_prompts", True),
-        "quantization_mode": raw_config.get("quantization_mode", "8bit"),
-        "use_chat_template": raw_config.get("use_chat_template", True),
-        "prompt_debug": raw_config.get("prompt_debug") or {},
-        "generation_profiles": raw_config.get("generation_profiles") or {},
-        "diary_profile": load_diary_profile_runtime_config(raw_config),
-        "guard": guard_config,
-        "audit": load_audit_runtime_config(raw_config, guard_config),
-        "stop_sequences": generation_cfg.get("stop_sequences", []),
-        **{key: generation_cfg.get(key) for key in GENERATION_KEYS},
+        **{field: raw.get(field) for field in fields},
+        "asset_root": str(root),
+        "config_path": config_path,
+        "output_root": raw.get("output_root", raw.get("output_dir") or ("runs/webui" if webui else DEFAULT_OUTPUT_ROOT)),
+        "output_name": raw.get("output_name", DEFAULT_OUTPUT_NAME),
+        "print_prompts": raw.get("print_prompts", False),
+        "quantization_mode": raw.get("quantization_mode", "8bit"),
+        "use_chat_template": raw.get("use_chat_template", True),
+        "generation_profiles": raw.get("generation_profiles") or {},
+        "diary_profile": load_diary_profile_runtime_config(raw, root),
+        "guard": guard,
+        "audit": deep_merge_dict(base_audit, raw.get("audit")),
+        "stop_sequences": generation.get("stop_sequences", []),
+        **{key: generation.get(key) for key in GENERATION_KEYS},
     }
-    apply_cli_overrides(
-        runtime,
-        args,
-        {"config", "dry_run", "prompt_debug_enabled", "prompt_debug_output_dir"},
+    apply_cli_overrides(runtime, args, {
+        "asset_root", "config", "dry_run", "external_base_model",
+        "prompt_debug_enabled", "prompt_debug_output_dir",
+    })
+    if args.external_base_model is not None:
+        if args.model_name_or_path is not None:
+            raise ValueError("Choose either --model-name-or-path or --external-base-model")
+        runtime["model_name_or_path"] = str(external_base_model(args.external_base_model))
+    require_keys(runtime, [*fields, *GENERATION_KEYS], kind)
+    if args.external_base_model is None:
+        runtime["model_name_or_path"] = str(asset_path(
+            root, runtime["model_name_or_path"], "model_name_or_path", "assets", directory=True,
+        ))
+    adapter = asset_path(
+        root, runtime["checkpoint_dir"], "checkpoint_dir", "checkpoints", "runs", directory=True,
     )
+    runtime["checkpoint_dir"] = str(adapter)
+    adapter_parent = adapter.relative_to(root)
+    for filename in ("adapter_config.json", "adapter_model.safetensors", "adapter_model.bin"):
+        asset_path(root, str(adapter_parent / filename), filename, "checkpoints", "runs",
+                   required=filename == "adapter_config.json" and not args.dry_run)
+    if getattr(args, "output_dir", None):
+        runtime["output_root"] = args.output_dir
+    runtime["output_root"] = str(asset_path(
+        root, runtime["output_root"], "output_root", "runs", directory=True, required=False,
+    ))
+    from diary_core.infer.output_bundle import normalize_output_name
 
-    require_keys(
-        runtime,
-        [
-            "model_name_or_path",
-            "checkpoint_dir",
-            "input_file",
-            "device",
-            "batch_size",
-            "print_prompts",
-            *GENERATION_KEYS,
-        ],
-        "generate",
-    )
-
-    runtime["config_path"] = config_path
-    runtime["model_name_or_path"] = str(resolve_path(runtime["model_name_or_path"]))
-    runtime["checkpoint_dir"] = str(resolve_path(runtime["checkpoint_dir"]))
-    runtime["input_file"] = str(resolve_path(runtime["input_file"]))
-    if runtime.get("output_file"):
-        runtime["legacy_output_file"] = str(resolve_path(runtime["output_file"]))
-    runtime.pop("output_file", None)
-    runtime["output_root"] = str(resolve_path(runtime.get("output_root") or DEFAULT_OUTPUT_ROOT))
-    runtime["output_name"] = str(runtime.get("output_name") or DEFAULT_OUTPUT_NAME)
-    runtime["batch_size"] = int(runtime["batch_size"])
-    runtime["print_prompts"] = str2bool(runtime["print_prompts"])
-    runtime["quantization_mode"] = str(runtime.get("quantization_mode") or "8bit")
+    runtime["output_name"] = normalize_output_name(runtime["output_name"])
+    output_parent = Path(runtime["output_root"]).relative_to(root) / runtime["output_name"]
+    asset_path(root, str(output_parent), "output parent", "runs", directory=True, required=False)
+    if webui:
+        runtime["save_md"] = str2bool(runtime["save_md"])
+        runtime["share"] = str2bool(runtime["share"])
+        runtime["server_port"] = int(runtime["server_port"])
+    else:
+        inputs = ("data/eval",) if evaluation else ("assets/prompts", "data/eval")
+        runtime["input_file"] = str(asset_path(root, runtime["input_file"], "input_file", *inputs))
+        output_file = runtime.get("output_file") or raw.get("output_file")
+        if output_file:
+            runtime["requested_output_file"] = str(asset_path(root, output_file, "output_file", "runs", required=False))
+        runtime["batch_size"] = int(runtime["batch_size"])
+        if runtime["batch_size"] <= 0:
+            raise ValueError("batch_size must be positive")
+        runtime["print_prompts"] = str2bool(runtime["print_prompts"])
+    runtime["quantization_mode"] = str(runtime["quantization_mode"] or "8bit")
     normalize_generation_fields(runtime)
-    apply_prompt_debug_overrides(runtime, args)
+    prompt_debug = dict(raw.get("prompt_debug") or {})
+    if args.prompt_debug_enabled is not None:
+        prompt_debug["enabled"] = args.prompt_debug_enabled
+    if args.prompt_debug_output_dir is not None:
+        prompt_debug["output_dir"] = args.prompt_debug_output_dir
+    if "output_dir" in prompt_debug:
+        prompt_debug["output_dir"] = str(asset_path(
+            root, prompt_debug["output_dir"], "prompt_debug.output_dir", "runs", directory=True, required=False,
+        ))
+    runtime["prompt_debug"] = normalize_prompt_debug_config(prompt_debug, root)
+    runtime["product_content"] = load_product_content(root)
     return runtime
+
+
+def build_batch_runtime_config(args: argparse.Namespace, *, evaluation: bool = False) -> dict[str, Any]:
+    return build_runtime_config(args, "generate", evaluation=evaluation)
 
 
 def build_webui_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
-    config_path = Path(args.config).expanduser().resolve()
-    raw_config = load_yaml_config(config_path, "config/webui.yaml")
-    generation_cfg = raw_config.get("generation") or {}
-    guard_config = load_guard_runtime_config(raw_config)
+    return build_runtime_config(args, "webui")
 
-    runtime = {
-        "model_name_or_path": raw_config.get("model_name_or_path"),
-        "checkpoint_dir": raw_config.get("checkpoint_dir"),
-        "device": raw_config.get("device"),
-        "output_dir": raw_config.get("output_dir"),
-        "output_root": raw_config.get("output_root", raw_config.get("output_dir") or DEFAULT_OUTPUT_ROOT),
-        "output_name": raw_config.get("output_name", DEFAULT_OUTPUT_NAME),
-        "save_md": raw_config.get("save_md"),
-        "server_name": raw_config.get("server_name"),
-        "server_port": raw_config.get("server_port"),
-        "share": raw_config.get("share"),
-        "quantization_mode": raw_config.get("quantization_mode", "8bit"),
-        "use_chat_template": raw_config.get("use_chat_template", True),
-        "prompt_debug": raw_config.get("prompt_debug") or {},
-        "generation_profiles": raw_config.get("generation_profiles") or {},
-        "diary_profile": load_diary_profile_runtime_config(raw_config),
-        "guard": guard_config,
-        "audit": load_audit_runtime_config(raw_config, guard_config),
-        "stop_sequences": generation_cfg.get("stop_sequences", []),
-        **{key: generation_cfg.get(key) for key in GENERATION_KEYS},
-    }
-    apply_cli_overrides(
-        runtime,
-        args,
-        {"config", "dry_run", "prompt_debug_enabled", "prompt_debug_output_dir"},
+
+def inference_summary(runtime: dict[str, Any]) -> dict[str, Any]:
+    keys = (
+        "asset_root", "config_path", "model_name_or_path", "checkpoint_dir", "input_file", "device",
+        "output_root", "output_name", "output_run_dir", "output_file", "requested_output_file", "parameters_file", "quantization_mode",
+        "batch_size", "server_name", "server_port", "share", "save_md", *GENERATION_KEYS,
     )
-
-    require_keys(
-        runtime,
-        [
-            "model_name_or_path",
-            "checkpoint_dir",
-            "device",
-            "save_md",
-            "server_name",
-            "server_port",
-            "share",
-            *GENERATION_KEYS,
-        ],
-        "webui",
-    )
-
-    runtime["config_path"] = config_path
-    runtime["model_name_or_path"] = str(resolve_path(runtime["model_name_or_path"]))
-    runtime["checkpoint_dir"] = str(resolve_path(runtime["checkpoint_dir"]))
-    if runtime.get("output_dir"):
-        runtime["legacy_output_dir"] = str(resolve_path(runtime["output_dir"]))
-    runtime.pop("output_dir", None)
-    runtime["output_root"] = str(resolve_path(runtime.get("output_root") or DEFAULT_OUTPUT_ROOT))
-    runtime["output_name"] = str(runtime.get("output_name") or DEFAULT_OUTPUT_NAME)
-    runtime["save_md"] = str2bool(runtime["save_md"])
-    runtime["share"] = str2bool(runtime["share"])
-    runtime["server_port"] = int(runtime["server_port"])
-    runtime["quantization_mode"] = str(runtime.get("quantization_mode") or "8bit")
-    normalize_generation_fields(runtime)
-    apply_prompt_debug_overrides(runtime, args)
-    return runtime
+    summary = {key: str(runtime[key]) if isinstance(runtime[key], Path) else runtime[key] for key in keys if key in runtime}
+    if isinstance(runtime.get("prompt_debug"), dict):
+        summary["prompt_debug"] = {key: runtime["prompt_debug"].get(key) for key in ("enabled", "output_dir")}
+    if isinstance(runtime.get("diary_profile"), dict):
+        summary["diary_profile"] = {"enabled": runtime["diary_profile"]["enabled"]}
+    return summary
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Inference config smoke test")
+    parser = argparse.ArgumentParser(description="Validate product inference config", add_help=False)
     parser.add_argument("--kind", choices=("batch", "webui"), default="batch")
-    parser.add_argument("--config", default=None)
-    args = parser.parse_args()
+    args, argv = parser.parse_known_args()
     if args.kind == "batch":
-        batch_args = build_batch_parser().parse_args(["--config", args.config or str(DEFAULT_GENERATE_CONFIG_PATH), "--dry-run"])
-        runtime = build_batch_runtime_config(batch_args)
+        entry, builder = build_batch_parser(), build_batch_runtime_config
     else:
-        webui_args = build_webui_parser().parse_args(["--config", args.config or str(DEFAULT_WEBUI_CONFIG_PATH), "--dry-run"])
-        runtime = build_webui_runtime_config(webui_args)
-    print(dump_runtime_config(runtime))
+        entry, builder = build_webui_parser(), build_webui_runtime_config
+    runtime = build_or_exit(entry, builder, entry.parse_args(argv))
+    print(dump_runtime_config(inference_summary(runtime)))
 
 
 if __name__ == "__main__":

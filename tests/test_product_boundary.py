@@ -1,12 +1,14 @@
 from concurrent.futures import ThreadPoolExecutor
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 from threading import Event
 
 import torch
 
 from diary_core.infer.diary_runtime import DiaryRuntime
+from diary_core.infer.product_content import load_product_content
 
 
 class Batch(dict):
@@ -48,7 +50,11 @@ class Model:
         return torch.cat([input_ids, torch.tensor([[8, 9]])], dim=1)
 
 
-def config():
+ROOT = Path(__file__).resolve().parents[1]
+EXAMPLE = ROOT / "product_assets/example"
+
+
+def config(asset_root=EXAMPLE):
     return dict(
         device="cpu",
         max_new_tokens=32,
@@ -61,13 +67,17 @@ def config():
         prompt_debug={"enabled": False},
         diary_profile={"enabled": False},
         use_chat_template=True,
-        guard={"enabled": True, "max_retry": 1, "retry_on_warnings": True},
+        product_content=load_product_content(asset_root),
+        guard={
+            "enabled": True, "max_retry": 1, "retry_on_warnings": True,
+            **({"thresholds": {"min_format_score": 99, "min_final_score": 99}} if asset_root == EXAMPLE else {}),
+        },
     )
 
 
-def probe():
+def probe(asset_root=EXAMPLE):
     tokenizer, model = Tokenizer(), Model()
-    result = DiaryRuntime(config(), tokenizer, model).generate(
+    result = DiaryRuntime(config(asset_root), tokenizer, model).generate(
         "我给蓝盒贴了新标签。",
         system="测试语气",
         role="测试员",
@@ -90,11 +100,12 @@ def probe():
 
 
 def test_prompt_retry_and_decode_match_baseline():
-    data = json.dumps(probe(), sort_keys=True, ensure_ascii=False).encode()
-    assert (
-        sha256(data).hexdigest()
-        == "5f9e4d83c39967bb3f7db32bbdf79e954f89fa1b7b685939f074d0520e45497e"
-    )
+    asset_root = os.getenv("BOA_PARITY_ASSET_ROOT")
+    result = probe(Path(asset_root) if asset_root else EXAMPLE)
+    assert len(result["renders"]) == len(result["requests"]) == 2
+    if asset_root:
+        data = json.dumps(result, sort_keys=True, ensure_ascii=False).encode()
+        assert sha256(data).hexdigest() == "5f9e4d83c39967bb3f7db32bbdf79e954f89fa1b7b685939f074d0520e45497e"
 
 
 def test_interleaved_browser_sessions_and_late_result(monkeypatch, tmp_path):
@@ -199,67 +210,40 @@ def test_gradio_wires_independent_state_and_clear():
 
 
 def test_legacy_entrypoints_with_synthetic_product_config(tmp_path):
+    import shutil
     import subprocess
     import sys
 
-    cfg = config()
-    cfg["generation"] = {
-        key: cfg[key]
-        for key in (
-            "max_new_tokens",
-            "temperature",
-            "top_p",
-            "top_k",
-            "repetition_penalty",
-            "num_beams",
-            "stop_sequences",
-        )
-    }
-    cfg.update(
-        model_name_or_path="synthetic-base",
-        checkpoint_dir="synthetic-adapter",
-        input_file="synthetic-input",
-        output_root=str(tmp_path),
-        batch_size=1,
-        print_prompts=False,
-        save_md=False,
-        server_name="127.0.0.1",
-        server_port=7860,
-        share=False,
-    )
-    fixture = tmp_path / "product.yaml"
-    fixture.write_text(json.dumps(cfg))
-    root = Path(__file__).resolve().parents[1]
+    root = tmp_path / "assets"
+    shutil.copytree(EXAMPLE, root)
+    base = root / "assets/base/synthetic"
+    base.mkdir(parents=True, exist_ok=True)
+    adapter = root / "checkpoints/synthetic"
+    adapter.mkdir(exist_ok=True)
     for entry in ("generate/predict.py", "webui/webui_8bithf.py"):
-        output = subprocess.run(
-            [sys.executable, "-B", entry, "--config", str(fixture), "--dry-run"],
-            cwd=root,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        runtime = json.loads(output.stdout.split("\n", 1)[1])
-        assert runtime["model_name_or_path"] == str(root / "synthetic-base")
-        assert (
-            runtime["checkpoint_dir"] == str(root / "synthetic-adapter")
-            and not runtime["diary_profile"]["enabled"]
-        )
-    cfg["diary_profile"] = {
-        "enabled": True,
-        "profile_path": str(tmp_path / "missing-profile.yaml"),
-    }
-    fixture.write_text(json.dumps(cfg))
-    missing = subprocess.run(
-        [
-            sys.executable,
-            "-B",
-            "generate/predict.py",
-            "--dry-run",
-            "--config",
-            str(fixture),
-        ],
-        cwd=root,
-        capture_output=True,
-        text=True,
-    )
-    assert missing.returncode and "missing-profile.yaml" in missing.stderr
+        for cwd in (ROOT, tmp_path):
+            output = subprocess.run(
+                [sys.executable, "-B", str(ROOT / entry), "--asset-root", str(root),
+                 "--checkpoint-dir", "checkpoints/synthetic", "--dry-run"],
+                cwd=cwd, capture_output=True, text=True, check=True,
+            )
+            runtime = json.loads(output.stdout)
+            assert runtime["model_name_or_path"] == str(base)
+            assert runtime["checkpoint_dir"] == str(adapter)
+            assert not runtime["diary_profile"]["enabled"]
+            assert "product_content" not in runtime
+
+    cmd = [sys.executable, "-B", str(ROOT / "generate/predict.py"), "--asset-root", str(root), "--dry-run"]
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (root / "runs/redirect").symlink_to(outside, target_is_directory=True)
+    for flag, value, expected in (
+        ("--config", "config/missing.yaml", "is missing"),
+        ("--input-file", "assets/prompts/missing.txt", "is missing"),
+        ("--output-root", "runs/redirect/new", "crosses symlink"),
+        ("--output-name", "..", "single directory name"),
+        ("--output-file", "runs/../outside.txt", "may not contain '..'"),
+    ):
+        output = subprocess.run([*cmd, flag, value], cwd=tmp_path, capture_output=True, text=True)
+        assert output.returncode and expected in output.stderr
+    assert not list(outside.iterdir())

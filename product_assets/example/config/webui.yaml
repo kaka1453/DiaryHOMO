@@ -1,0 +1,28 @@
+{
+  "model_name_or_path": "assets/base/synthetic",
+  "checkpoint_dir": "checkpoints",
+  "device": "cpu",
+  "quantization_mode": "none",
+  "use_chat_template": false,
+  "diary_profile": {
+    "enabled": false
+  },
+  "generation": {
+    "max_new_tokens": 4,
+    "temperature": 0.8,
+    "top_p": 0.95,
+    "top_k": 8,
+    "repetition_penalty": 1.0,
+    "num_beams": 1
+  },
+  "audit": {
+    "enabled": true,
+    "write_jsonl": true,
+    "write_summary": true,
+    "write_table": false
+  },
+  "save_md": true,
+  "server_name": "127.0.0.1",
+  "server_port": 7860,
+  "share": false
+}

@@ -1,0 +1,49 @@
+{
+  "values": {
+    "DEFAULT_GUARD_CONFIG": {
+      "enabled": false,
+      "thresholds": {
+        "min_final_score": 50,
+        "min_topic_score": 50,
+        "min_drift_score": 50,
+        "min_format_score": 50,
+        "min_language_score": 50,
+        "min_quality_score": 50
+      },
+      "quality": {},
+      "audit": {}
+    },
+    "STYLE_OR_GENERIC_TERMS": [],
+    "HUMOR_HINTS": [],
+    "SMOKE_CASES": []
+  },
+  "wording": {
+    "build_revision_instruction": [
+      "Keep the note focused on the present observation. ",
+      "Keep the note focused on the present observation. ",
+      "Keep the note focused on the present observation. ",
+      "Keep the note focused on the present observation. ",
+      "Keep the note focused on the present observation. ",
+      "Keep the note focused on the present observation. ",
+      "Keep the note focused on the present observation. ",
+      "Keep the note focused on the present observation. ",
+      "Keep the note focused on the present observation. ",
+      "Keep the note focused on the present observation. ",
+      "Keep the note focused on the present observation. ",
+      "Keep the note focused on the present observation. ",
+      "Keep the note focused on the present observation. ",
+      "Keep the note focused on the present observation. ",
+      "Keep the note focused on the present observation. ",
+      "Keep the note focused on the present observation. "
+    ],
+    "is_searchable_forbidden_term": [
+      "ObservatoryFixtureToken0",
+      "ObservatoryFixtureToken1",
+      "ObservatoryFixtureToken2",
+      "ObservatoryFixtureToken3",
+      "ObservatoryFixtureToken4",
+      "ObservatoryFixtureToken5",
+      "ObservatoryFixtureToken6"
+    ]
+  }
+}

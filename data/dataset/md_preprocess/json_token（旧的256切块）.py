@@ -1,23 +1,34 @@
 import json
 import csv
-from transformers import AutoTokenizer
 
 # === 核心配置 ===
 MAX_TOKENS = 256
 OVERLAP_TARGET = 40       # 搜索范围：期望重叠的长度
 SAFE_BUFFER = 8          # 安全缓冲
-MODEL_ID = "Qwen/Qwen2.5-7B"
+from pathlib import Path
+import sys
+
+sys.dont_write_bytecode = True
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from diary_core.data.preprocess import preprocessing_paths
+
+input_file, output_file, stats_file, MODEL_ID = preprocessing_paths(
+    source='data/train/diary_resize.jsonl',
+    target='data/train/diary_resize256.jsonl',
+    stats='runs/preprocess/token_stats.csv',
+    tokenizer=True,
+)
 
 # 第一轮切割限制：预留出重叠空间
 # 例如：512 - 60 - 10 = 442。保证切出来的块加上重叠后不会爆。
 CUT_LIMIT = MAX_TOKENS - OVERLAP_TARGET - SAFE_BUFFER
 
-input_file = "diary_resize.jsonl"
-output_file = "diary_resize256.jsonl"
-stats_file = "token_stats.csv"
 
 print(f"正在加载 Tokenizer ({MODEL_ID})...")
-tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
+from transformers import AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, local_files_only=True, trust_remote_code=True)
 
 def get_token_len(text):
     """获取精准的 token 数，不带特殊符"""
