@@ -14,7 +14,6 @@ from diary_core.config.common import (
 )
 from diary_core.model.quantization import normalize_quantization_mode
 
-
 DEFAULT_TRAIN_CONFIG_PATH = PROJECT_ROOT / "config" / "train.yaml"
 DEFAULT_MODEL_CONFIG_PATH = PROJECT_ROOT / "config" / "model.yaml"
 
@@ -46,9 +45,17 @@ MODEL_CONFIG_FIELDS = [
     "lora_bias",
 ]
 
-RUNTIME_FIELDS = set(TRAIN_CONFIG_FIELDS + MODEL_CONFIG_FIELDS)
+OPTIONAL_DEFAULTS = {
+    "backend": "hf",
+    "compute_dtype": "fp16",
+    "gradient_checkpointing": "auto",
+    "benchmark_warmup_steps": 2,
+}
+
+RUNTIME_FIELDS = set(TRAIN_CONFIG_FIELDS + MODEL_CONFIG_FIELDS + list(OPTIONAL_DEFAULTS))
 PATH_FIELDS = {"model_name_or_path", "checkpoint_dir", "data_file_path"}
 INT_FIELDS = {
+    "benchmark_warmup_steps",
     "max_length",
     "batch_size",
     "epochs",
@@ -73,11 +80,15 @@ POSITIVE_FIELDS = {
     "lora_r",
     "lora_alpha",
 }
-NON_NEGATIVE_FIELDS = {"warmup_steps", "num_workers"}
+NON_NEGATIVE_FIELDS = {"warmup_steps", "num_workers", "benchmark_warmup_steps"}
 ALLOWED_QUANTIZATION_MODES = {"4bit", "8bit", "none"}
 
 
 CLI_OVERRIDE_SPECS = [
+    ("--backend", "backend", str, "Training backend: hf or unsloth (separate processes)."),
+    ("--compute-dtype", "compute_dtype", str, "Compute precision: fp16 or bf16."),
+    ("--gradient-checkpointing", "gradient_checkpointing", str, "auto, standard, unsloth, or none."),
+    ("--benchmark-warmup-steps", "benchmark_warmup_steps", int, "Optimizer updates excluded from steady-state metrics."),
     ("--model-name-or-path", "model_name_or_path", str, "Override model path from config."),
     ("--checkpoint-dir", "checkpoint_dir", str, "Override checkpoint output directory from config."),
     ("--data-file-path", "data_file_path", str, "Override training dataset path from config."),
@@ -167,6 +178,8 @@ def collect_config_values(config_data: dict[str, Any], fields: list[str]) -> dic
 
 
 def apply_runtime_casts(runtime: dict[str, Any]) -> None:
+    for key, default in OPTIONAL_DEFAULTS.items():
+        runtime.setdefault(key, default)
     for field in PATH_FIELDS:
         runtime[field] = str(resolve_path(runtime[field]))
     for field in INT_FIELDS:
@@ -181,6 +194,22 @@ def apply_runtime_casts(runtime: dict[str, Any]) -> None:
 
 
 def validate_runtime_values(runtime: dict[str, Any]) -> None:
+    for key, default in OPTIONAL_DEFAULTS.items():
+        runtime.setdefault(key, default)
+    if runtime["backend"] not in {"hf", "unsloth"}:
+        raise ValueError("backend 必须是 hf 或 unsloth。")
+    if runtime["compute_dtype"] not in {"fp16", "bf16"}:
+        raise ValueError("compute_dtype 必须是 fp16 或 bf16。")
+    if runtime["gradient_checkpointing"] == "auto":
+        runtime["gradient_checkpointing"] = "unsloth" if runtime["backend"] == "unsloth" else "standard"
+    if runtime["gradient_checkpointing"] not in {"standard", "unsloth", "none"}:
+        raise ValueError("gradient_checkpointing 必须是 auto/standard/unsloth/none。")
+    if runtime["backend"] == "hf" and runtime["gradient_checkpointing"] == "unsloth":
+        raise ValueError("HF 后端不能使用 Unsloth 梯度检查点。")
+    if runtime["backend"] == "unsloth" and runtime["quantization_mode"] == "8bit":
+        raise ValueError("本次 Unsloth 接入仅提供 4bit/none，不支持 8bit。")
+    if not 0 <= runtime["lora_dropout"] < 1:
+        raise ValueError("lora_dropout 必须在 [0, 1) 内。")
     if runtime["quantization_mode"] not in ALLOWED_QUANTIZATION_MODES:
         raise ValueError(
             f"quantization_mode 必须是 {', '.join(sorted(ALLOWED_QUANTIZATION_MODES))} 之一。"
@@ -210,6 +239,7 @@ def build_train_runtime_config(args: argparse.Namespace) -> dict[str, Any]:
 
     runtime = collect_config_values(train_cfg, TRAIN_CONFIG_FIELDS)
     runtime.update(collect_config_values(model_cfg, MODEL_CONFIG_FIELDS))
+    runtime.update({key: train_cfg.get(key, default) for key, default in OPTIONAL_DEFAULTS.items()})
     if runtime.get("quantization_mode") is None and "load_in_8bit" in train_cfg:
         runtime["quantization_mode"] = "8bit" if str2bool(train_cfg["load_in_8bit"]) else "none"
 

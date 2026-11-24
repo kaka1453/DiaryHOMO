@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-import argparse
 import json
+import warnings
 
-import torch
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-from transformers import AutoModelForCausalLM
+from diary_core.config.train_config import (
+    build_train_parser,
+    build_train_runtime_config,
+)
+from diary_core.train.bootstrap import initialize_backend
 
-from diary_core.config.train_config import build_train_parser, build_train_runtime_config
-from diary_core.model.quantization import build_quantization_config
 
+def create_lora_config(runtime: dict):
+    from peft import LoraConfig
 
-def create_lora_config(runtime: dict) -> LoraConfig:
     return LoraConfig(
         r=runtime["lora_r"],
         lora_alpha=runtime["lora_alpha"],
@@ -22,23 +23,95 @@ def create_lora_config(runtime: dict) -> LoraConfig:
     )
 
 
-def load_training_model(runtime: dict, lora_config: LoraConfig):
+def load_training_model(runtime: dict, lora_config=None):
+    """兼容 HF 模型加载接口；Unsloth 必须成对加载 tokenizer/model。"""
+    if runtime.get("backend", "hf") != "hf":
+        raise ValueError(
+            "Unsloth 请使用 load_training_components，不能重复 PEFT 包装。"
+        )
+    initialize_backend(runtime)
+    import torch
+    from peft import get_peft_model, prepare_model_for_kbit_training
+    from transformers import AutoModelForCausalLM
+
+    from diary_core.model.quantization import build_quantization_config
+
+    dtype = torch.bfloat16 if runtime.get("compute_dtype") == "bf16" else torch.float16
     quantization_config = build_quantization_config(runtime["quantization_mode"])
+    if runtime["quantization_mode"] == "4bit":
+        quantization_config.bnb_4bit_compute_dtype = dtype
     load_kwargs = {
-        "device_map": "auto",
+        "device_map": {"": torch.cuda.current_device()}
+        if torch.cuda.is_available()
+        else "auto",
         "trust_remote_code": True,
-        "dtype": torch.float16,
+        "dtype": dtype,
     }
     if quantization_config is not None:
         load_kwargs["quantization_config"] = quantization_config
-
-    model = AutoModelForCausalLM.from_pretrained(runtime["model_name_or_path"], **load_kwargs)
-    if runtime["quantization_mode"] != "none":
-        model = prepare_model_for_kbit_training(model)
+    model = AutoModelForCausalLM.from_pretrained(
+        runtime["model_name_or_path"], **load_kwargs
+    )
+    checkpointing = runtime.get("gradient_checkpointing", "standard") != "none"
+    if quantization_config is not None:
+        model = prepare_model_for_kbit_training(
+            model, use_gradient_checkpointing=checkpointing
+        )
     model.config.use_cache = False
-    model.gradient_checkpointing_enable()
-    model.enable_input_require_grads()
-    return get_peft_model(model, lora_config)
+    if checkpointing:
+        model.gradient_checkpointing_enable()
+        model.enable_input_require_grads()
+    return get_peft_model(model, lora_config or create_lora_config(runtime))
+
+
+def load_training_components(runtime: dict):
+    if runtime.get("backend", "hf") == "hf":
+        model = load_training_model(runtime)
+        from diary_core.model.loader import load_tokenizer
+
+        return model, load_tokenizer(runtime["model_name_or_path"], use_fast=False)
+
+    initialize_backend(runtime)
+    import torch
+    from unsloth import FastLanguageModel
+
+    if runtime["lora_dropout"] != 0 or runtime["lora_bias"] != "none":
+        warnings.warn(
+            "Unsloth 快速 LoRA 路径建议 dropout=0、bias=none；不自动修改用户参数。",
+            stacklevel=2,
+        )
+    checkpointing = {"standard": True, "unsloth": "unsloth", "none": False}[
+        runtime["gradient_checkpointing"]
+    ]
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name=runtime["model_name_or_path"],
+        max_seq_length=runtime["max_length"],
+        dtype=torch.bfloat16 if runtime["compute_dtype"] == "bf16" else torch.float16,
+        load_in_4bit=runtime["quantization_mode"] == "4bit",
+        load_in_8bit=False,
+        device_map={"": torch.cuda.current_device()},
+        trust_remote_code=False,
+        local_files_only=True,
+        use_exact_model_name=True,
+        use_gradient_checkpointing=checkpointing,
+    )
+    model = FastLanguageModel.get_peft_model(
+        model,
+        r=runtime["lora_r"],
+        lora_alpha=runtime["lora_alpha"],
+        target_modules=runtime["lora_target_modules"],
+        lora_dropout=runtime["lora_dropout"],
+        bias=runtime["lora_bias"],
+        use_gradient_checkpointing=checkpointing,
+        random_state=runtime["seed"],
+        max_seq_length=runtime["max_length"],
+    )
+    FastLanguageModel.for_training(model, use_gradient_checkpointing=checkpointing)
+    model.config.use_cache = False
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "right"
+    return model, tokenizer
 
 
 def main() -> None:
@@ -46,18 +119,24 @@ def main() -> None:
     parser.add_argument("--load-model", action="store_true")
     args = parser.parse_args()
     runtime = build_train_runtime_config(args)
-    lora_config = create_lora_config(runtime)
     summary = {
-        "quantization_mode": runtime["quantization_mode"],
-        "lora_r": lora_config.r,
-        "lora_alpha": lora_config.lora_alpha,
-        "lora_target_modules": sorted(list(lora_config.target_modules)),
-        "load_model": args.load_model,
+        key: runtime[key]
+        for key in (
+            "backend",
+            "quantization_mode",
+            "lora_r",
+            "lora_alpha",
+            "lora_target_modules",
+        )
     }
+    summary["load_model"] = args.load_model
+    summary["lora_target_modules"] = sorted(runtime["lora_target_modules"])
     if args.load_model:
-        model = load_training_model(runtime, lora_config)
+        model, _ = load_training_components(runtime)
         summary["model_class"] = model.__class__.__name__
-        summary["trainable_parameters"] = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        summary["trainable_parameters"] = sum(
+            p.numel() for p in model.parameters() if p.requires_grad
+        )
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 

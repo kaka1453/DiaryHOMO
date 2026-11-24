@@ -3,9 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 
-import torch
-from transformers import BitsAndBytesConfig
-
 
 def normalize_quantization_mode(value: str | None) -> str:
     normalized = str(value or "8bit").strip().lower()
@@ -30,6 +27,10 @@ def normalize_quantization_mode(value: str | None) -> str:
 
 
 def build_quantization_config(mode: str | None = "8bit"):
+    # 配置解析必须保持轻量，Unsloth 要先于 Transformers 导入。
+    import torch
+    from transformers import BitsAndBytesConfig
+
     normalized = normalize_quantization_mode(mode)
     if normalized == "4bit":
         return BitsAndBytesConfig(
