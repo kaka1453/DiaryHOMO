@@ -27,6 +27,15 @@ ErrorCode = Literal[
     "GENERATION_FAILED",
     "UNSAFE_OUTPUT",
     "SAVE_FAILED",
+    "AUTH_REQUIRED",
+    "FORBIDDEN",
+    "UNSUPPORTED_FIELD",
+    "PAYLOAD_TOO_LARGE",
+    "QUEUE_FULL",
+    "TIMEOUT",
+    "CANCELLED",
+    "REQUEST_NOT_FOUND",
+    "SERVICE_UNAVAILABLE",
 ]
 
 _MESSAGES: dict[ErrorCode, str] = {
@@ -47,6 +56,15 @@ _MESSAGES: dict[ErrorCode, str] = {
     "GENERATION_FAILED": "The inference backend failed to generate a reply.",
     "UNSAFE_OUTPUT": "Generation produced a control or unsupported protocol block.",
     "SAVE_FAILED": "History could not be saved to a private output directory.",
+    "AUTH_REQUIRED": "A valid service credential is required.",
+    "FORBIDDEN": "The credential does not authorize this operation.",
+    "UNSUPPORTED_FIELD": "The request uses an unsupported field or mode.",
+    "PAYLOAD_TOO_LARGE": "The request body exceeds the service limit.",
+    "QUEUE_FULL": "The local inference queue is full.",
+    "TIMEOUT": "The local inference request exceeded its deadline.",
+    "CANCELLED": "The request was cancelled.",
+    "REQUEST_NOT_FOUND": "No matching active request exists.",
+    "SERVICE_UNAVAILABLE": "The local inference service is not ready.",
 }
 
 

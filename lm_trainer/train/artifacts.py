@@ -191,6 +191,31 @@ def verify_artifact(
     ):
         if not isinstance(m.get(key), str) or not _SHA.fullmatch(m[key]):
             raise ValueError(f"Missing or invalid artifact {key}.")
+    if "data_lineage" in m:
+        lineage = m["data_lineage"]
+        if (
+            not isinstance(lineage, list)
+            or not lineage
+            or any(
+                not isinstance(entry, dict)
+                or set(entry) != {"release_id", "manifest_sha256", "parent_version"}
+                or not isinstance(entry["release_id"], str)
+                or not entry["release_id"]
+                or not isinstance(entry["manifest_sha256"], str)
+                or not _SHA.fullmatch(entry["manifest_sha256"])
+                or (
+                    entry["parent_version"] is not None
+                    and not isinstance(entry["parent_version"], str)
+                )
+                for entry in lineage
+            )
+            or not any(
+                entry["release_id"] == m["data_release_id"]
+                and entry["manifest_sha256"] == m["manifest_sha256"]
+                for entry in lineage
+            )
+        ):
+            raise ValueError("Invalid artifact data lineage.")
     for key in ("parent_adapter_sha256", "resume_checkpoint_sha256"):
         if key not in m or (
             m[key] is not None

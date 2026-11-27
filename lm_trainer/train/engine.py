@@ -56,6 +56,7 @@ def simulate_pipeline(runtime: dict, *, emit=True) -> dict:
     train_loader = build_data_loader(runtime, dataset, tokenizer)
     lora_config = create_lora_config(runtime)
     schedule = compute_schedule(runtime, train_loader)
+    sampling = projected_exposure(train_loader, runtime, schedule)
     first_batch = next(iter(train_loader))
 
     summary = {
@@ -71,7 +72,8 @@ def simulate_pipeline(runtime: dict, *, emit=True) -> dict:
         "planned_training_steps": schedule["planned_training_steps"],
         "fixture_only": dataset.plan["fixture_only"],
         "data_plan": stage_plan_report(dataset),
-        "sampling": projected_exposure(train_loader, runtime, schedule),
+        "tokenizer": tokenizer_evidence(tokenizer, runtime),
+        "sampling": sampling,
     }
     if emit:
         print(json.dumps(summary, ensure_ascii=False, indent=2))
@@ -79,9 +81,41 @@ def simulate_pipeline(runtime: dict, *, emit=True) -> dict:
     return summary
 
 
+def tokenizer_evidence(tokenizer, runtime):
+    from importlib.metadata import version
+
+    from lm_trainer.train.artifacts import tokenizer_hash
+    from lm_trainer.train.stages import policy_identity
+
+    return {
+        "class": type(tokenizer).__name__,
+        "transformers_version": version("transformers"),
+        "tokenizers_version": version("tokenizers") if tokenizer.is_fast else None,
+        "tokenizer_hash": tokenizer_hash(tokenizer) if tokenizer.is_fast else None,
+        "template_hash": policy_identity(tokenizer, runtime)["template_hash"],
+    }
+
+
 def stage_plan_report(dataset):
     return {
         **dataset.plan,
+        **(
+            {"conversation_renderer": dataset.conversation_renderer}
+            if dataset.conversation_renderer
+            else {}
+        ),
+        "token_statistics": dataset.statistics,
+        "statistics_basis": {
+            "statistics": "pre_tokenization_records_and_characters",
+            "token_statistics": "actual_tokenizer_and_shifted_labels",
+        },
+        "overlength_isolation": {
+            "count": 0,
+            "unit": "windows_or_documents",
+            "policy": "reject_stage",
+        }
+        if dataset.plan["objective"] != "legacy"
+        else None,
         "template_policy": dataset.template_policy
         or public_policy(dataset.plan["template_policy"]),
     }
@@ -126,26 +160,38 @@ def update_window(model, optimizer, scheduler, accelerator, window):
     if not math.isfinite(loss_value):
         optimizer.zero_grad(set_to_none=True)
         raise FloatingPointError("Non-finite loss before optimizer update.")
+    # GradScaler must decide an overflowed FP16 step on unscaled gradients.
+    # Never let a skip advance the scheduler or return a committable update.
+    has_scaler = getattr(accelerator, "scaler", None) is not None
+    if has_scaler:
+        accelerator.unscale_gradients(optimizer)
     gradients = [
         p.grad.detach()
         for group in optimizer.param_groups
         for p in group["params"]
         if p.grad is not None
     ]
-    if (
-        not gradients
-        or not torch.isfinite(torch.stack(torch._foreach_norm(gradients, float("inf"))))
+    if not gradients:
+        optimizer.zero_grad(set_to_none=True)
+        raise FloatingPointError("Missing gradient before optimizer update.")
+    finite = (
+        torch.isfinite(torch.stack(torch._foreach_norm(gradients, float("inf"))))
         .all()
         .item()
-    ):
+    )
+    if not finite and not has_scaler:
         optimizer.zero_grad(set_to_none=True)
-        raise FloatingPointError(
-            "Missing or non-finite gradient before optimizer update."
-        )
+        raise FloatingPointError("Non-finite gradient before optimizer update.")
     optimizer.step()
     optimizer.zero_grad(set_to_none=True)
     if accelerator.optimizer_step_was_skipped:
-        raise FloatingPointError("AMP skipped the optimizer update.")
+        raise FloatingPointError(
+            "AMP skipped the optimizer update; resume from the last committed checkpoint."
+        )
+    if not finite:
+        raise RuntimeError(
+            "AMP optimizer did not skip a non-finite gradient; aborting without publication."
+        )
     scheduler.step()
     return loss_value, targets
 
@@ -429,6 +475,10 @@ def run_training(
             raise ValueError("Empty training dataset.")
         schedule = compute_schedule(runtime, loader)
         if stage is not None:
+            if stage.dev is not None:
+                stage.encoded_dev = load_training_dataset(
+                    runtime, tokenizer, validated=stage.dev
+                )
             stage.identify_plan(loader, schedule)
             stop_after = runtime.get("stop_after_updates")
             if (
@@ -497,6 +547,8 @@ def run_training(
                 "template_policy",
             )
         }
+        if dataset.conversation_renderer:
+            artifact_data["conversation_renderer"] = dataset.conversation_renderer
     optimizer = torch.optim.AdamW(
         (p for p in model.parameters() if p.requires_grad), lr=runtime["lr"]
     )
@@ -546,6 +598,8 @@ def run_training(
         }
     )
     first_step = len(updates)
+    warmup = runtime.get("benchmark_warmup_steps", 2)
+    attempt_timing = []
     save_seconds = 0.0
     eval_seconds = 0.0
     target = schedule["planned_training_steps"]
@@ -564,11 +618,18 @@ def run_training(
             "dev_seconds": eval_seconds,
             "run_wall_seconds_including_setup_and_save": time.perf_counter() - started,
         }
-        steady = summarize_updates(
-            updates[max(first_step, runtime.get("benchmark_warmup_steps", 2)) :], 0
-        )
+        steady = summarize_updates(updates[first_step:], warmup)
         result = {
             "backend": runtime.get("backend", "hf"),
+            "benchmark_warmup_updates": warmup,
+            "gradient_checkpointing": runtime.get("gradient_checkpointing"),
+            "batch_size": runtime["batch_size"],
+            "gradient_accumulation_steps": accumulation,
+            "kv_cache_enabled": getattr(unwrapped.config, "use_cache", None),
+            "steady_loader_wait_seconds": sum(w for w, _ in attempt_timing[warmup:]),
+            "steady_main_process_cpu_seconds": sum(
+                c for _, c in attempt_timing[warmup:]
+            ),
             "optimizer_updates": len(updates),
             "compute_dtype": precision,
             "quantization_mode": runtime["quantization_mode"],
@@ -706,14 +767,33 @@ def run_training(
             order = loader.batch_sampler.batches_at(epoch)
             next_batch = cursor["next_batch"]
         start = time.perf_counter()
+        cpu_start = time.process_time()
         with closing(accumulation_windows(loader, accumulation)) as windows:
             for window in windows:
+                wait = time.perf_counter() - start
+                if staged:
+                    expected = [
+                        [dataset[i]["trace"]["sample_id"] for i in indices]
+                        for indices in order[next_batch : next_batch + len(window)]
+                    ]
+                    observed = [
+                        [t["sample_id"] for t in batch.trace] for batch in window
+                    ]
+                    if expected != observed:
+                        raise RuntimeError(
+                            "Dispatched batches diverged from the committed sampling plan."
+                        )
                 loss, tokens = update_window(
                     model, optimizer, scheduler, accelerator, window
                 )
                 sync()
                 elapsed = time.perf_counter() - start
-                exposure.observe(trace for batch in window for trace in batch.trace)
+                attempt_timing.append((wait, time.process_time() - cpu_start))
+                exposure.observe(
+                    (trace for batch in window for trace in batch.trace),
+                    microbatches=len(window),
+                    accumulation=accumulation,
+                )
                 row = {
                     "loss": loss,
                     "loss_tokens": tokens,
@@ -728,17 +808,6 @@ def run_training(
                     "lr": scheduler.get_last_lr()[0],
                 }
                 if staged:
-                    expected = [
-                        [dataset[i]["trace"]["sample_id"] for i in indices]
-                        for indices in order[next_batch : next_batch + len(window)]
-                    ]
-                    observed = [
-                        [t["sample_id"] for t in batch.trace] for batch in window
-                    ]
-                    if expected != observed:
-                        raise RuntimeError(
-                            "Consumed batches diverged from the committed sampling plan."
-                        )
                     row["batch_order_sha256"] = digest(observed)
                     row["batch_tensors_sha256"] = batch_tensor_digest(window)
                     next_batch += len(window)
@@ -775,6 +844,7 @@ def run_training(
                 if step == stop_after:
                     break
                 start = time.perf_counter()
+                cpu_start = time.process_time()
         record_epoch(metrics, epoch_rows)
         if len(updates) == stop_after:
             break

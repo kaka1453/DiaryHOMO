@@ -12,7 +12,7 @@ from time import perf_counter
 from typing import Any
 from weakref import WeakValueDictionary
 
-from .context import PROTOCOL, ContextBuilder
+from .context import INFERENCE_CONTROLS, PROTOCOL, ContextBuilder, check_inference_text
 from .registry import ModelRegistry, VerifiedModel
 from .types import (
     ActivationInfo,
@@ -38,6 +38,7 @@ class Trace:
     peak_vram_mb: float | None = None
     card_audit: tuple[CardAudit, ...] = ()
     dropped_turns: int | None = None
+    reference_tokens: int | None = None
 
 
 class VisibleStreamer:
@@ -48,7 +49,14 @@ class VisibleStreamer:
     """
 
     def __init__(
-        self, tokenizer, policy, native_eos, cancel: Event, emit: Callable[[str], None]
+        self,
+        tokenizer,
+        policy,
+        native_eos,
+        cancel: Event,
+        emit: Callable[[str], None],
+        *,
+        controls=PROTOCOL,
     ):
         from tokenizers.decoders import DecodeStream
 
@@ -62,7 +70,7 @@ class VisibleStreamer:
         self.bad_ids.discard(tokenizer.unk_token_id)
         self.stops = {s.lower() for s in policy["stop_tokens"]}
         self.blocked = {
-            s.lower() for s in (*policy["control_tokens"], *PROTOCOL)
+            s.lower() for s in (*policy["control_tokens"], *controls)
         } - self.stops
         self.markers = sorted(self.stops | self.blocked, key=lambda p: (-len(p), p))
         self.pattern = re.compile("|".join(map(re.escape, self.markers)), re.IGNORECASE)
@@ -403,9 +411,75 @@ class HFBackend:
         ids = self._bind_context(
             role, history, text, cards, audit_entries, settings, builder, trace
         )
+        return self._respond_ids(settings, cancel, emit, trace, ids)
+
+    def verify_inference_v1(self, role, *, structured):
+        verified = self._active.verified
+        expected = verified.policy["system_prompt"]
+        if expected not in (None, role.system_prompt):
+            raise ChatError("TEMPLATE_UNSUPPORTED")
+        if structured and verified.conversation_renderer is None:
+            raise ChatError("ARTIFACT_MISMATCH")
+        if (
+            structured
+            and expected != role.system_prompt
+            and not verified.spec.fixture_only
+        ):
+            raise ChatError("TEMPLATE_UNSUPPORTED")
+        check_inference_text(
+            role.system_prompt,
+            tokenizer=verified.tokenizer,
+            policy=verified.policy,
+            application=True,
+        )
+        return verified.policy["version"], (
+            verified.conversation_renderer["renderer_version"] if structured else None
+        )
+
+    def respond_inference_v1(
+        self,
+        *,
+        role,
+        messages,
+        observation,
+        target_person,
+        cards,
+        audit_entries,
+        settings,
+        builder,
+        cancel,
+        emit,
+        trace,
+        card_guard=None,
+    ):
+        verified = self._active.verified
+        built = builder.build_inference_v1(
+            verified.tokenizer,
+            verified.policy,
+            role=role,
+            messages=messages,
+            observation=observation,
+            target_person=target_person,
+            cards=cards,
+            audit_entries=audit_entries,
+            context_limit=verified.context_limit,
+            max_new_tokens=settings.max_new_tokens,
+            card_guard=card_guard,
+        )
+        trace.card_audit = built.card_audit
+        trace.reference_tokens = built.injected_tokens
+        return self._respond_ids(
+            settings, cancel, emit, trace, built.input_ids, inference_v1=True
+        )
+
+    def _respond_ids(self, settings, cancel, emit, trace, ids, *, inference_v1=False):
         if cancel.is_set():
             return "", "cancel"
         try:
+            if inference_v1:
+                return self._generate(
+                    settings, cancel, emit, trace, ids, controls=INFERENCE_CONTROLS
+                )
             return self._generate(settings, cancel, emit, trace, ids)
         except Exception as exc:
             code = _backend_error(exc, "GENERATION_FAILED")
@@ -438,7 +512,7 @@ class HFBackend:
         # Return the prompt rather than mutating the active model.
         return built.input_ids
 
-    def _generate(self, settings, cancel, emit, trace, ids):
+    def _generate(self, settings, cancel, emit, trace, ids, *, controls=PROTOCOL):
         import torch
         from transformers import (
             LogitsProcessorList,
@@ -448,7 +522,9 @@ class HFBackend:
 
         active = self._active
         tok, policy = active.verified.tokenizer, active.verified.policy
-        gate = VisibleStreamer(tok, policy, active.native_eos, cancel, emit)
+        gate = VisibleStreamer(
+            tok, policy, active.native_eos, cancel, emit, controls=controls
+        )
         device = active.input_device
         gpu = device.type == "cuda"
 

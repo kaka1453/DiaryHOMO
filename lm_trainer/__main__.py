@@ -37,9 +37,10 @@ def main():
         stages = runtime.get("stages", [runtime])
         explicit = bool(stages[0].get("init_adapter"))
         if explicit:
-            from .train.stages import artifact_reference, dev_preflight
+            from .train.stages import artifact_reference, data_lineage, dev_preflight
 
             plans = []
+            lineage_by_stage = {}
             for item in stages:
                 if not (
                     args.dry_run or args.validate_release or args.simulate_only
@@ -52,8 +53,17 @@ def main():
                 )
                 data = preflight_data(item)
                 dev = dev_preflight(item, data)
-                if not item.get("parent_stage"):
-                    artifact_reference(item)
+                if item.get("parent_stage"):
+                    reference = {"data_lineage": lineage_by_stage[item["parent_stage"]]}
+                else:
+                    _, reference, _ = artifact_reference(item)
+                lineage = data_lineage(data.plan, reference)
+                lineage_by_stage[item["name"]] = lineage
+                shares = item.get("structured_sft_loss_token_share")
+                if shares is not None and set(shares) != set(data.plan["sources"]):
+                    raise ValueError(
+                        "Sampling share keys must match all selected, approved sources"
+                    )
                 plan = {
                     **data.plan,
                     "template_policy": public_policy(data.plan["template_policy"]),
@@ -72,6 +82,15 @@ def main():
                         "warmup_steps": item["warmup_steps"],
                         "lora_target_modules": item["lora_target_modules"],
                         "data_plan": plan,
+                        "data_lineage": lineage,
+                        "sampling_requirements": {
+                            key: item.get(key)
+                            for key in (
+                                "require_exact_token_budget",
+                                "sampling_max_share_error",
+                                "structured_sft_loss_token_share",
+                            )
+                        },
                         "dev_manifest_sha256": dev.plan["manifest_sha256"]
                         if dev
                         else None,

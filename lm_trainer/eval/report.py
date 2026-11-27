@@ -30,6 +30,7 @@ def summarize(result_dict: dict) -> dict:
             record["model_id"],
             record["kind"],
             record.get("memory_condition", "M0"),
+            record.get("scenario") or "unspecified",
         )
         groups[key].append(record)
     per_model = []
@@ -54,6 +55,7 @@ def summarize(result_dict: dict) -> dict:
                 "model_id": key[0],
                 "kind": key[1],
                 "memory_condition": key[2],
+                "scenario": key[3],
                 "metrics_source": rows[0].get("metrics_source", "mock"),
                 **metrics,
             }
@@ -96,7 +98,7 @@ def to_csv(result_dict: dict) -> str:
     """Export the flat per-unit table (no rubric, no reference)."""
 
     columns = [
-        "case_id", "model_id", "kind", "memory_condition", "turn_index",
+        "case_id", "model_id", "kind", "scenario", "memory_condition", "turn_index",
         "finish_reason", "committed", "error_code", "input_tokens",
         "output_tokens", "ttft_ms", "tokens_per_second", "latency_ms",
         "peak_vram_mb", "prompt_sha256", "card_audit", "output",
@@ -149,14 +151,15 @@ def render_markdown(
     lines += [
         "## 分组实测指标",
         "",
-        "| 模型 | 类型 | 条件 | 单元 | 提交 | 错误 | 输入 tokens | 输出 tokens | TTFT ms | tok/s | 峰值显存 MiB |",
-        "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| 模型 | 类型 | 场景 | 条件 | 单元 | 提交 | 错误 | 输入 tokens | 输出 tokens | TTFT ms | tok/s | 峰值显存 MiB |",
+        "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in summary.get("per_model", []):
         lines.append(
-            "| `{model_id}` | {kind} | {condition} | {units} | {committed} | {errors} | {input_tokens} | {output_tokens} | {ttft} | {tps} | {vram} |".format(
+            "| `{model_id}` | {kind} | {scenario} | {condition} | {units} | {committed} | {errors} | {input_tokens} | {output_tokens} | {ttft} | {tps} | {vram} |".format(
                 model_id=row["model_id"],
                 kind=row["kind"],
+                scenario=row.get("scenario", "unspecified"),
                 condition=row["memory_condition"],
                 units=row["units"],
                 committed=row["committed"],

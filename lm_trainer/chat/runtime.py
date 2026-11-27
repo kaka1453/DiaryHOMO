@@ -16,8 +16,14 @@ from time import perf_counter
 from typing import Protocol
 from uuid import uuid4
 
+from lm_trainer.conversation import (
+    RENDERER_VERSION,
+    ConversationError,
+    render_observation,
+)
+
 from .backend import HFBackend, Trace
-from .context import ContextBuilder
+from .context import ContextBuilder, check_inference_text
 from .memory import ContextCard, MemoryProvider, NoMemoryProvider, audit
 from .registry import ModelRegistry
 from .types import (
@@ -169,9 +175,16 @@ class ChatRuntime:
         self._sessions: dict[str, _Session] = {}
         self._state = Lock()
         self._model_lock = Lock()
+        self._inference_pin = None
 
     def list_models(self) -> list[ModelInfo]:
         return self._list_models()
+
+    def _acquire_model(self, cancellation):
+        while not cancellation.is_set():
+            if self._model_lock.acquire(timeout=0.025):
+                return True
+        return False
 
     def _session(self, session_id):
         if not valid_id(session_id) or session_id not in self._sessions:
@@ -216,8 +229,16 @@ class ChatRuntime:
         with self._model_lock:
             return self._backend.active
 
+    def _activate_model(self, model_id):
+        # Caller owns the model lock, including server lease changes.
+        if self._inference_pin is not None and model_id != self._inference_pin:
+            raise ChatError("DEVICE_BUSY")
+        return self._backend.activate(model_id)
+
     def unload(self):
         with self._model_lock:
+            if self._inference_pin is not None:
+                raise ChatError("DEVICE_BUSY")
             try:
                 self._backend.unload()
             except Exception:
@@ -235,7 +256,7 @@ class ChatRuntime:
             s.switching = True
         try:
             with self._model_lock:
-                self._backend.activate(model_id)
+                self._activate_model(model_id)
                 with self._state:
                     if new_session:
                         return self._new_session(model_id, s.role, s.settings)
@@ -349,17 +370,14 @@ class ChatRuntime:
                     cards, role=s.role, session_id=s.session_id
                 )
                 trace.card_audit = entries
-                acquired = False
-                while not cancellation.is_set() and not acquired:
-                    acquired = self._model_lock.acquire(timeout=0.025)
-                if acquired:
+                if self._acquire_model(cancellation):
                     try:
                         if not cancellation.is_set():
                             if (
                                 not self._backend.active
                                 or self._backend.active.model_id != s.model_id
                             ):
-                                trace.activation = self._backend.activate(s.model_id)
+                                trace.activation = self._activate_model(s.model_id)
                             if not cancellation.is_set():
                                 text, reason = self._backend.respond(
                                     role=s.role,
@@ -483,6 +501,55 @@ class _MockBackend:
         reply = self.responder(role, history, text)
         if not isinstance(reply, str):
             raise ChatError("GENERATION_FAILED")
+        return reply, "eos"
+
+    @staticmethod
+    def verify_inference_v1(role, *, structured):
+        check_inference_text(role.system_prompt, application=True)
+        return None, RENDERER_VERSION if structured else None
+
+    def respond_inference_v1(
+        self, *, role, messages, observation, target_person, cards, trace, **_
+    ):
+        trace.card_audit += tuple(audit(c, "not_sent") for c in cards)
+        if observation is not None:
+            try:
+                for event in observation.events:
+                    if event.selection == "text":
+                        check_inference_text(event.content)
+                turns = render_observation(observation, target_person, None)
+            except ConversationError as exc:
+                code = (
+                    "UNSAFE_CONTENT"
+                    if str(exc).startswith("reserved control")
+                    else "INVALID_INPUT"
+                )
+                raise ChatError(code) from None
+            messages = tuple((t.role, t.message()["content"]) for t in turns)
+        else:
+            for _, text in messages:
+                check_inference_text(text)
+        history = tuple(
+            Message(
+                r,
+                text,
+                "",
+                "",
+                "",
+                self.active.model_id,
+                role.role_id,
+                role.version,
+                None,
+            )
+            for r, text in messages[:-1]
+        )
+        reply = self.responder(role, history, messages[-1][1])
+        if not isinstance(reply, str):
+            raise ChatError("GENERATION_FAILED")
+        try:
+            check_inference_text(reply, application=True)
+        except ChatError:
+            raise ChatError("UNSAFE_OUTPUT") from None
         return reply, "eos"
 
 

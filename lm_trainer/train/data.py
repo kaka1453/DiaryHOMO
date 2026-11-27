@@ -2,14 +2,24 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
+from dataclasses import asdict
 
 import torch
 from torch.utils.data import DataLoader
 
+from lm_trainer.conversation import ConversationError
 from lm_trainer.template_policy import public_policy, resolve_policy
-from lm_trainer.train.encoding import IGNORE, EncodingError, encode_sft, encode_text
+from lm_trainer.train.encoding import (
+    IGNORE,
+    EncodingError,
+    conversation_identity,
+    encode_conversation,
+    encode_sft,
+    encode_text,
+)
 from lm_trainer.train.sampling import SortedBatchSampler, sampling_plan
 from lm_trainer.train.schema import DataContractError, preflight_data
+from lm_trainer.train.token_audit import audit_encoding
 
 
 class CausalBatch(dict):
@@ -67,10 +77,20 @@ class DataCollatorForCausalLMWith8xPadding:
             amount = padded_len - len(ids)
             inputs.append([*ids, *([pad] * amount)])
             masks.append([*mask, *([0] * amount)])
-            labels.append(
-                [v if active else IGNORE for v, active in zip(lab, mask)]
-                + [IGNORE] * amount
-            )
+            padded_labels = [
+                v if active else IGNORE for v, active in zip(lab, mask)
+            ] + [IGNORE] * amount
+            if "loss_tokens" in f.get("trace", {}) and (
+                sum(v != IGNORE for v in padded_labels[1:]) != f["trace"]["loss_tokens"]
+                or any(
+                    v != IGNORE and not mask[i - 1]
+                    for i, v in enumerate(padded_labels[1 : len(ids)], 1)
+                )
+            ):
+                raise ValueError(
+                    "Collapsed/padded shifted labels disagree with token audit"
+                )
+            labels.append(padded_labels)
             if "trace" in f:
                 trace.append(f["trace"])
         return CausalBatch(
@@ -92,6 +112,7 @@ class EncodedDataset(list):
         self.plan = plan
         self.statistics = {}
         self.template_policy = None
+        self.conversation_renderer = None
 
 
 def load_training_dataset(runtime, tokenizer, *, validated=None):
@@ -106,68 +127,171 @@ def load_training_dataset(runtime, tokenizer, *, validated=None):
             raise DataContractError(str(exc), path="template_policy") from None
         dataset.template_policy = public_policy(policy)
     lengths = defaultdict(list)
+    targets_by_source, events_by_source = defaultdict(set), defaultdict(set)
+    rejected_length = defaultdict(int)
     for sample in validated.samples:
-        row, source = sample.row, sample.source
+        row, source, window = sample.row, sample.source, sample.conversation
         try:
-            result = (
-                encode_sft(tokenizer, row, template, policy, plan)
-                if is_sft
-                else encode_text(tokenizer, row["text"], plan)
-            )
-        except EncodingError as exc:
+            if window is not None:
+                results = encode_conversation(tokenizer, window, template, policy, plan)
+                dataset.conversation_renderer = conversation_identity(policy)
+            elif is_sft:
+                results = (encode_sft(tokenizer, row, template, policy, plan),)
+            else:
+                results = (encode_text(tokenizer, row["text"], plan),)
+        except (EncodingError, ConversationError) as exc:
+            if str(exc) in {
+                "CPT document exceeds max_length; not truncated",
+                "SFT context exceeds max_length; no target truncated",
+            }:
+                rejected_length[(source, str(exc))] += 1
+                continue
             sample.fail(str(exc))
         except (ValueError, TypeError, RuntimeError):
             sample.fail("tokenizer failed to encode the sample")
         source_ids = (
-            tuple(
+            window.timeline
+            if window is not None
+            else tuple(
                 dict.fromkeys(sid for m in row["messages"] for sid in m["source_ids"])
             )
             if is_sft
             else tuple(row.get("source_ids", ()))
         )
-        trace = {
-            "sample_id": row.get("id"),
-            "source": source,
-            "source_ids": source_ids,
-            "event_group": row.get("event_group"),
-            "source_index_ref": row.get("source_index_ref"),
-            "body_tokens": result.body_targets,
-            "eos_tokens": result.eos_targets,
-            "loss_tokens": result.body_targets + result.eos_targets,
-            "input_tokens": len(result.input_ids),
-            "truncated": result.truncated,
-        }
-        dataset.append(
-            {
-                "input_ids": result.input_ids,
-                "attention_mask": [1] * len(result.input_ids),
-                "labels": result.labels,
-                "trace": trace,
+        for result in results:
+            try:
+                effective = audit_encoding(
+                    result, plan, policy=policy if window is not None else None
+                )
+            except EncodingError as exc:
+                sample.fail(str(exc))
+            targets = (
+                result.focus_ids
+                if window is not None
+                else tuple(
+                    sid
+                    for message, selected in zip(
+                        row["messages"], row["target_mask"], strict=True
+                    )
+                    if selected
+                    for sid in message["source_ids"]
+                )
+                if is_sft
+                else source_ids
+            )
+            targets_by_source[source].update(targets)
+            if row.get("event_group") is not None:
+                events_by_source[source].add(row["event_group"])
+            trace = {
+                "sample_id": row.get("id"),
+                "source": source,
+                "source_ids": source_ids,
+                "event_group": row.get("event_group"),
+                "source_index_ref": row.get("source_index_ref"),
+                "body_tokens": result.body_targets,
+                "eos_tokens": result.eos_targets,
+                "loss_tokens": effective,
+                "target_source_ids": targets,
+                "target_separator_tokens": result.roles.count("target_separator"),
+                "input_tokens": len(result.input_ids),
+                "truncated": result.truncated,
             }
+            if window is not None:
+                visible_ids = {
+                    span.source_id for span in result.spans if span.source_id
+                }
+                trace.update(
+                    source_ids=tuple(sid for sid in source_ids if sid in visible_ids),
+                    window_id=trace["sample_id"],
+                    sample_id=result.focus_ids[
+                        0
+                    ],  # globally unique by release validation
+                    format=window.conversation.mode,
+                    focus_ids=result.focus_ids,
+                    spans=tuple(asdict(span) for span in result.spans),
+                    prefix_tokens=len(result.prefix_ids),
+                    **dataset.conversation_renderer,
+                )
+            dataset.append(
+                {
+                    "input_ids": result.input_ids,
+                    "attention_mask": [1] * len(result.input_ids),
+                    "labels": result.labels,
+                    "trace": trace,
+                }
+            )
+            lengths[source].append(trace["input_tokens"])
+            stats = dataset.statistics.setdefault(
+                source,
+                {
+                    **plan["statistics"][source],
+                    "unique_body_tokens": 0,
+                    "unique_eos_tokens": 0,
+                    "unique_loss_tokens": 0,
+                    "unique_input_tokens": 0,
+                    "unique_target_separator_tokens": 0,
+                    "rejected": 0,
+                    "truncated": 0,
+                    "truncation_reasons": {},
+                    "eos_only_samples": 0,
+                },
+            )
+            for key in (
+                "body_tokens",
+                "eos_tokens",
+                "loss_tokens",
+                "input_tokens",
+                "target_separator_tokens",
+            ):
+                stats[f"unique_{key}"] += trace[key]
+            if window is not None:
+                modes = stats.setdefault("formats", {})
+                fmt = modes.setdefault(
+                    trace["format"],
+                    {
+                        "opportunities": 0,
+                        "unique_target_sources": 0,
+                        "input_tokens": 0,
+                        "body_tokens": 0,
+                        "eos_tokens": 0,
+                        "target_separator_tokens": 0,
+                        "context_annotation_tokens": 0,
+                        "prefix_tokens": 0,
+                    },
+                )
+                fmt["opportunities"] += 1
+                fmt["unique_target_sources"] += len(result.focus_ids)
+                for key in (
+                    "input_tokens",
+                    "body_tokens",
+                    "eos_tokens",
+                    "prefix_tokens",
+                ):
+                    fmt[key] += trace[key]
+                fmt["target_separator_tokens"] += trace["target_separator_tokens"]
+                fmt["context_annotation_tokens"] += sum(
+                    result.roles.count(kind)
+                    for kind in ("alias", "gap", "media", "reply", "quote", "mention")
+                )
+            if result.truncated:
+                stats["truncated"] += 1
+                stats["truncation_reasons"]["legacy_max_length"] = stats["truncated"]
+            stats["eos_only_samples"] += result.body_targets == 0
+    if rejected_length:
+        counts = ", ".join(
+            f"{source}={n} ({reason})"
+            for (source, reason), n in sorted(rejected_length.items())
         )
-        lengths[source].append(trace["input_tokens"])
-        stats = dataset.statistics.setdefault(
-            source,
-            {
-                **plan["statistics"][source],
-                "unique_body_tokens": 0,
-                "unique_eos_tokens": 0,
-                "unique_loss_tokens": 0,
-                "unique_input_tokens": 0,
-                "rejected": 0,
-                "truncated": 0,
-                "truncation_reasons": {},
-                "eos_only_samples": 0,
-            },
+        raise DataContractError(
+            f"exceeds max_length; overlength isolation rejects the entire plan; windows/documents: {counts}",
+            path="token_preflight",
         )
-        for key in ("body_tokens", "eos_tokens", "loss_tokens", "input_tokens"):
-            stats[f"unique_{key}"] += trace[key]
-        if result.truncated:
-            stats["truncated"] += 1
-            stats["truncation_reasons"]["legacy_max_length"] = stats["truncated"]
-        stats["eos_only_samples"] += result.body_targets == 0
     for source, stats in dataset.statistics.items():
+        stats["unique_target_source_ids"] = len(targets_by_source[source])
+        stats["independent_event_groups"] = len(events_by_source[source])
         seq = sorted(lengths[source])
+        if "formats" in stats:
+            stats["windows"], stats["samples"] = stats["samples"], len(seq)
         stats["length_quantiles"] = {
             **{f"p{p}": seq[math.ceil(p * len(seq) / 100) - 1] for p in (50, 90, 99)},
             "max": seq[-1],

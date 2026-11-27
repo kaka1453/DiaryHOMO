@@ -1,5 +1,6 @@
 """Strict opt-in stage configuration, independent of the legacy YAML defaults."""
 
+import math
 import re
 from pathlib import Path
 
@@ -19,6 +20,9 @@ STAGE_DEFAULTS = {
     "dev_every": None,
     "save_probe_text": False,
     "stop_after_updates": None,
+    "require_exact_token_budget": False,
+    "sampling_max_share_error": None,
+    "structured_sft_loss_token_share": None,
 }
 BOUNDED_DEFAULTS = {
     "epochs": 1,
@@ -49,6 +53,9 @@ STAGE_LOCAL = {
     "token_budget",
     "max_sample_repeats",
     "max_effective_epochs",
+    "require_exact_token_budget",
+    "sampling_max_share_error",
+    "structured_sft_loss_token_share",
     "stop_after_updates",
 }
 
@@ -116,6 +123,43 @@ def configure_stage(runtime, root, path_root):
         raise ValueError(
             "stop_after_updates requires HF and a positive value below max_steps."
         )
+    if type(runtime["require_exact_token_budget"]) is not bool or (
+        runtime["require_exact_token_budget"] and runtime["token_budget"] is None
+    ):
+        raise ValueError(
+            "require_exact_token_budget must be boolean and requires token_budget when true."
+        )
+    shares = runtime["structured_sft_loss_token_share"]
+    if shares is not None:
+        from lm_trainer.conversation import WINDOW_SCHEMA
+
+        if (
+            runtime["objective"] != "assistant_only_messages"
+            or runtime["corpus_schema_allowlist"] != [WINDOW_SCHEMA]
+            or not isinstance(shares, dict)
+            or not shares
+            or any(
+                not identifier(k) or type(v) not in (int, float) or not 0 < v <= 1
+                for k, v in shares.items()
+            )
+            or not math.isclose(
+                math.fsum(shares.values()), 1.0, rel_tol=0, abs_tol=1e-9
+            )
+            or (
+                runtime["sources"] is not None
+                and set(shares) != set(runtime["sources"])
+            )
+        ):
+            raise ValueError(
+                "structured_sft_loss_token_share requires registered v3 SFT and positive source shares summing to 1."
+            )
+    error = runtime["sampling_max_share_error"]
+    if error is not None and (
+        type(error) not in (int, float)
+        or not math.isfinite(error)
+        or not 0 <= error <= 1
+    ):
+        raise ValueError("sampling_max_share_error must be between 0 and 1.")
     for key in ("dev_probe", "save_probe_text"):
         if type(runtime[key]) is not bool:
             raise ValueError(f"{key} must be boolean.")

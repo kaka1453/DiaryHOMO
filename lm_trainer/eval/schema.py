@@ -24,6 +24,11 @@ ALLOWED_SPLITS = ("dev", "test")
 REVIEW_ONLY_FIELDS = ("rubric", "reference_only")
 MEMORY_CONDITIONS = ("M0", "M1", "M2", "M3", "M4")
 KINDS = ("fixed_history", "multi_turn_rollout")
+SCENARIOS = (
+    "single_person_multiturn", "participant_reference", "diagnostic_judgment",
+    "bubble_and_stop", "context_cards", "clarify_without_evidence",
+    "instruction_retention", "privacy_boundary",
+)
 MAX_MESSAGES = 32
 MAX_CONTENT_CHARS = 20_000
 
@@ -90,6 +95,9 @@ def validate_case(
         "reference_only",
         "memory_condition",
     }
+    if "scenario" in value:
+        expected.add("scenario")
+        _require(value["scenario"] in SCENARIOS, "SCHEMA_INVALID", f"{source}: scenario")
     _require(
         allowed == expected,
         "SCHEMA_INVALID",
@@ -225,7 +233,7 @@ def build_manifest(cases: list[dict], *, split: str = "dev") -> dict:
         "fixture_only": True,
         "cases": digests,
         "case_count": len(cases),
-        "purpose": "fictional vision-support evaluation only",
+        "purpose": "fictional offline evaluation only",
     }
 
 

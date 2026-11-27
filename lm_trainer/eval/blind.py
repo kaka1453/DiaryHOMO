@@ -15,7 +15,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from lm_trainer.eval.schema import EvalError, canonical_json, sha256_text
+from lm_trainer.eval.schema import SCENARIOS, EvalError, canonical_json, sha256_text
 
 BLIND_SCHEMA = "lm_trainer.eval-blind.v1"
 MAP_SCHEMA = "lm_trainer.eval-blind-map.v1"
@@ -28,6 +28,10 @@ DIMENSIONS = (
     "evidence_use",
     "instruction_following",
     "engineering_isolation",
+    "participant_grounding",
+    "bubble_and_stop",
+    "clarification",
+    "privacy_boundary",
 )
 
 DIMENSION_LABELS = {
@@ -37,6 +41,10 @@ DIMENSION_LABELS = {
     "evidence_use": "外部证据/卡片使用",
     "instruction_following": "基础能力（指令遵循/终止/无复读）",
     "engineering_isolation": "工程与隔离红线",
+    "participant_grounding": "多人对象与引用归属",
+    "bubble_and_stop": "气泡拆分与终止",
+    "clarification": "缺证据时的拒答与澄清",
+    "privacy_boundary": "隐私边界",
 }
 
 CHOICES = ("left", "right", "tie", "both_fail", "skip")
@@ -63,6 +71,7 @@ class BlindItem:
     left: str = field(repr=False)
     right: str = field(repr=False)
     seed: int
+    scenario: str | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -99,6 +108,7 @@ class ReviewRecord:
     reason: str
     reviewer: str
     submitted_at: str
+    dimension_reasons: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -134,6 +144,12 @@ def _pair_case(records: list[dict]) -> list[tuple[dict, dict]]:
         if len({r["model_id"] for r in group}) != 2:
             continue
         a, b = sorted(group, key=lambda r: r["model_id"])
+        if any(a.get(field) != b.get(field) for field in (
+            "event_group", "split", "scenario", "prompt_sha256", "prompt"
+        )):
+            raise EvalError("BLIND_INVALID", "paired records disagree on their input or scenario")
+        if a.get("scenario") is not None and a["scenario"] not in SCENARIOS:
+            raise EvalError("BLIND_INVALID", "unknown scenario")
         pairs.append((a, b))
     return pairs
 
@@ -157,8 +173,6 @@ def make_blind_pack(
     pairs = _pair_case(records)
     if not pairs:
         raise EvalError("BLIND_NO_PAIR", "no two-model fixed-history pairs found")
-    if len({p[0]["model_id"] for p in pairs}) != 1 and len(pairs) > 1:
-        pass
     items: list[BlindItem] = []
     mapping: dict[str, dict] = {}
     seen: set[str] = set()
@@ -181,7 +195,7 @@ def make_blind_pack(
         if item_id in seen:
             continue
         seen.add(item_id)
-        prompt = (prompts or {}).get(left["case_id"], "")
+        prompt = left.get("prompt") or (prompts or {}).get(left["case_id"], "")
         items.append(
             BlindItem(
                 item_id=item_id,
@@ -194,6 +208,7 @@ def make_blind_pack(
                 left=left["output"],
                 right=right["output"],
                 seed=seed,
+                scenario=left.get("scenario"),
             )
         )
         mapping[item_id] = {
@@ -274,10 +289,13 @@ def load_blind_pack(path: Path | str) -> BlindPack:
             item["left"],
             item["right"],
             item["seed"],
+            item.get("scenario"),
         )
         for item in payload["items"]
     ]
     for item in items:
+        if item.scenario is not None and item.scenario not in SCENARIOS:
+            raise EvalError("BLIND_INVALID", "unknown scenario")
         text = f"{item.prompt}\n{item.left}\n{item.right}"
         for marker in FORBIDDEN_IN_BLIND:
             if marker in text:
@@ -305,6 +323,7 @@ def submit_review(
     choice: str,
     scores: dict[str, int] | None = None,
     reason: str = "",
+    dimension_reasons: dict[str, str] | None = None,
     reviewer: str = "anonymous",
     submitted_at: str = "",
 ) -> ReviewRecord:
@@ -316,12 +335,9 @@ def submit_review(
         raise EvalError("REVIEW_INVALID", f"choice {choice!r}")
     if not any(item.item_id == item_id for item in pack.items):
         raise EvalError("REVIEW_INVALID", "unknown item")
-    scores = scores or {}
-    for key, value in scores.items():
-        if key not in DIMENSIONS:
-            raise EvalError("REVIEW_INVALID", f"unknown dimension {key!r}")
-        if type(value) is not int or not 1 <= value <= 5:
-            raise EvalError("REVIEW_INVALID", f"score {key}={value!r}")
+    scores = {} if scores is None else scores
+    dimension_reasons = {} if dimension_reasons is None else dimension_reasons
+    _check_dimensions(scores, dimension_reasons)
     record = ReviewRecord(
         item_id,
         choice,
@@ -329,6 +345,7 @@ def submit_review(
         reason[:4000],
         reviewer[:64],
         submitted_at or datetime.now(UTC).isoformat(),
+        dict(dimension_reasons),
     )
     path = _review_path(pack, Path(review_dir))
     line = json.dumps(
@@ -344,6 +361,17 @@ def submit_review(
     return record
 
 
+def _check_dimensions(scores, reasons):
+    if not isinstance(scores, dict) or not isinstance(reasons, dict):
+        raise EvalError("REVIEW_INVALID", "scores and dimension_reasons must be objects")
+    for key, value in scores.items():
+        if key not in DIMENSIONS or type(value) is not int or not 1 <= value <= 5:
+            raise EvalError("REVIEW_INVALID", f"invalid dimension score: {key!r}")
+    for key, value in reasons.items():
+        if key not in scores or not isinstance(value, str) or not value.strip() or len(value) > 1000:
+            raise EvalError("REVIEW_INVALID", "dimension reasons require a scored dimension and 1–1000 characters")
+
+
 def load_reviews(pack: BlindPack, review_dir: Path | str) -> list[ReviewRecord]:
     path = _review_path(pack, Path(review_dir))
     if not path.exists():
@@ -355,6 +383,7 @@ def load_reviews(pack: BlindPack, review_dir: Path | str) -> list[ReviewRecord]:
         entry = json.loads(line)
         if entry.get("schema") != REVIEW_SCHEMA:
             raise EvalError("REVIEW_INVALID", "schema")
+        _check_dimensions(entry["scores"], entry.get("dimension_reasons", {}))
         out.append(
             ReviewRecord(
                 entry["item_id"],
@@ -363,6 +392,7 @@ def load_reviews(pack: BlindPack, review_dir: Path | str) -> list[ReviewRecord]:
                 entry.get("reason", ""),
                 entry.get("reviewer", ""),
                 entry.get("submitted_at", ""),
+                entry.get("dimension_reasons", {}),
             )
         )
     return out
@@ -425,6 +455,7 @@ def reveal(
             "case_id": item.case_id,
             "event_group": item.event_group,
             "memory_condition": item.memory_condition,
+            "scenario": item.scenario,
             "left": info["left"],
             "right": info["right"],
         }
@@ -433,14 +464,13 @@ def reveal(
             record["choice"] = review.choice
             record["reason"] = review.reason
             record["scores"] = review.scores
-            if review.choice == "left":
-                wins[info["left"]] = wins.get(info["left"], 0) + 1
+            record["dimension_reasons"] = review.dimension_reasons
+            if review.choice != "skip":
                 case_ids.add(item.case_id)
                 event_ids.add(item.event_group)
-            elif review.choice == "right":
-                wins[info["right"]] = wins.get(info["right"], 0) + 1
-                case_ids.add(item.case_id)
-                event_ids.add(item.event_group)
+            if review.choice in ("left", "right"):
+                winner = info[review.choice]
+                wins[winner] = wins.get(winner, 0) + 1
             for name in DIMENSIONS:
                 if name in review.scores:
                     dimension_values[name].append(review.scores[name])

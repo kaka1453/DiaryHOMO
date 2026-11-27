@@ -8,6 +8,25 @@ from typing import Literal, Protocol
 
 from .types import CardAudit, ChatError, RoleConfig, valid_id
 
+CardKind = Literal[
+    "device_spec",
+    "incident_fact",
+    "troubleshooting_note",
+    "plan",
+    "shift_log",
+    "historical_judgment",
+    "confirmed_fact",
+]
+CARD_KINDS = (
+    "device_spec",
+    "incident_fact",
+    "troubleshooting_note",
+    "plan",
+    "shift_log",
+    "historical_judgment",
+    "confirmed_fact",
+)
+
 
 @dataclass(frozen=True, slots=True)
 class CardPermissions:
@@ -23,7 +42,7 @@ class CardPermissions:
 class ContextCard:
     card_id: str
     namespace: str
-    kind: Literal["device_spec", "incident_fact", "troubleshooting_note", "plan"]
+    kind: CardKind
     facts: tuple[str, ...] = field(repr=False)
     event_time: str
     recorded_at: str
@@ -42,8 +61,7 @@ class ContextCard:
         if (
             not valid_id(self.card_id)
             or not valid_id(self.namespace)
-            or self.kind
-            not in ("device_spec", "incident_fact", "troubleshooting_note", "plan")
+            or self.kind not in CARD_KINDS
             or self.status not in ("active", "superseded", "revoked")
             or not isinstance(self.facts, tuple)
             or not self.facts

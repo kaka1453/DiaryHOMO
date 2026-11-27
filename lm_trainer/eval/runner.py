@@ -92,6 +92,7 @@ class EvalCase:
     rubric: tuple[str, ...] = ()
     reference_only: tuple[str, ...] = ()
     memory_condition: str = M0_NO_CARD
+    scenario: str | None = None
 
     @classmethod
     def from_dict(cls, value: dict) -> EvalCase:
@@ -106,6 +107,7 @@ class EvalCase:
             tuple(case["rubric"]),
             tuple(case["reference_only"]),
             case["memory_condition"],
+            case.get("scenario"),
         )
 
     def to_dict(self) -> dict:
@@ -121,6 +123,7 @@ class EvalCase:
             "rubric": list(self.rubric),
             "reference_only": list(self.reference_only),
             "memory_condition": self.memory_condition,
+            **({"scenario": self.scenario} if self.scenario is not None else {}),
         }
 
     def prompt_messages(self) -> tuple[dict, ...]:
@@ -170,6 +173,7 @@ class EvalCaseRecord:
     prompt: str = field(default="", repr=False)
     history_mode: str = "sequential"
     metrics_source: str = MOCK
+    scenario: str | None = None
 
 
 @dataclass(slots=True)
@@ -315,6 +319,7 @@ def _record(
         prompt=prompt,
         history_mode=history_mode,
         metrics_source=mode,
+        scenario=case.scenario,
     )
 
 

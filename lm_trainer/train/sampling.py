@@ -117,7 +117,14 @@ def sampling_plan(dataset, runtime):
     plan = dataset.plan
     sources = plan["sources"]
     unique = {s: dataset.statistics[s]["unique_loss_tokens"] for s in sources}
-    mix = plan["target_loss_token_share"]
+    mix = (
+        runtime.get("structured_sft_loss_token_share")
+        or plan["target_loss_token_share"]
+    )
+    if mix != "natural" and set(mix) != set(sources):
+        raise ValueError(
+            "Sampling share keys must match all selected, approved sources"
+        )
     shares = (
         {s: n / sum(unique.values()) for s, n in unique.items()}
         if mix == "natural"
@@ -218,16 +225,33 @@ def sampling_plan(dataset, runtime):
     }
 
 
+def _trace_key(source, identity):
+    return hashlib.sha256(
+        json.dumps([source, identity], ensure_ascii=False).encode()
+    ).hexdigest()
+
+
 class Exposure:
     """Summarize consumed batches without exporting sample or origin IDs."""
 
     def __init__(self, sampler, *, track_unique=False):
         self.sampler = sampler
         self.track_unique = track_unique
-        self.seen = set()
+        self.repeats = defaultdict(int)
+        self.target_repeats = defaultdict(int)
+        self.events = defaultdict(set)
+        self.tail_windows = 0
+        self.last_microbatches = 0
         self.unique = {
             s: dict.fromkeys(
-                ("samples", "loss_tokens", "body_tokens", "eos_tokens", "input_tokens"),
+                (
+                    "samples",
+                    "loss_tokens",
+                    "body_tokens",
+                    "eos_tokens",
+                    "input_tokens",
+                    "target_separator_tokens",
+                ),
                 0,
             )
             for s in sampler.statistics
@@ -239,35 +263,64 @@ class Exposure:
                 "body_tokens": 0,
                 "eos_tokens": 0,
                 "input_tokens": 0,
+                "target_separator_tokens": 0,
+                "max_sample_repeats_observed": 0,
+                "max_target_repeats_observed": 0,
                 "truncated": 0,
             }
             for s in sampler.statistics
         }
         self.updates = 0
 
-    def observe(self, traces):
+    def observe(self, traces, *, microbatches=None, accumulation=None):
         self.updates += 1
+        if microbatches is not None:
+            self.last_microbatches = microbatches
+            self.tail_windows += microbatches < accumulation
         for trace in traces:
             counts = self.counts[trace["source"]]
             counts["samples"] += 1
             counts["truncated"] += trace.get("truncated", False)
             first = False
             if self.track_unique:
-                key = hashlib.sha256(trace["sample_id"].encode()).hexdigest()
-                first = key not in self.seen
-                self.seen.add(key)
+                source = trace["source"]
+                key = _trace_key(source, trace["sample_id"])
+                self.repeats[key] += 1
+                first = self.repeats[key] == 1
+                counts["max_sample_repeats_observed"] = max(
+                    counts["max_sample_repeats_observed"], self.repeats[key]
+                )
+                for sid in set(trace.get("target_source_ids", ())):
+                    target = _trace_key(source, sid)
+                    self.target_repeats[target] += 1
+                    counts["max_target_repeats_observed"] = max(
+                        counts["max_target_repeats_observed"],
+                        self.target_repeats[target],
+                    )
+                if trace.get("event_group") is not None:
+                    self.events[source].add(_trace_key(source, trace["event_group"]))
                 if first:
-                    self.unique[trace["source"]]["samples"] += 1
-            for key in ("loss_tokens", "body_tokens", "eos_tokens", "input_tokens"):
-                counts[key] += trace[key]
+                    self.unique[source]["samples"] += 1
+            for key in (
+                "loss_tokens",
+                "body_tokens",
+                "eos_tokens",
+                "input_tokens",
+                "target_separator_tokens",
+            ):
+                counts[key] += trace.get(key, 0)
                 if first:
-                    self.unique[trace["source"]][key] += trace[key]
+                    self.unique[trace["source"]][key] += trace.get(key, 0)
 
     def state_dict(self):
         return {
             "counts": self.counts,
             "unique": self.unique,
-            "seen": sorted(self.seen),
+            "repeats": dict(self.repeats),
+            "target_repeats": dict(self.target_repeats),
+            "events": {s: sorted(ids) for s, ids in self.events.items()},
+            "tail_windows": self.tail_windows,
+            "last_microbatches": self.last_microbatches,
             "updates": self.updates,
         }
 
@@ -277,7 +330,14 @@ class Exposure:
         ):
             raise ValueError("Incompatible exposure counters.")
         self.counts, self.unique = state["counts"], state["unique"]
-        self.seen, self.updates = set(state["seen"]), state["updates"]
+        self.repeats = defaultdict(int, state["repeats"])
+        self.target_repeats = defaultdict(int, state["target_repeats"])
+        self.events = defaultdict(
+            set, {s: set(ids) for s, ids in state["events"].items()}
+        )
+        self.tail_windows = state["tail_windows"]
+        self.last_microbatches = state["last_microbatches"]
+        self.updates = state["updates"]
 
     def report(self):
         sampler = self.sampler
@@ -288,6 +348,8 @@ class Exposure:
             "token_budget": budget,
             "unused_budget_loss_tokens": None if budget is None else budget - total,
             "optimizer_windows": self.updates,
+            "partial_accumulation_windows": self.tail_windows,
+            "last_window_microbatches": self.last_microbatches,
             "loss_tokens": total,
             "sources": {
                 s: {
@@ -297,6 +359,13 @@ class Exposure:
                     "sampled_body_tokens": c["body_tokens"],
                     "sampled_eos_tokens": c["eos_tokens"],
                     "sampled_input_tokens": c["input_tokens"],
+                    "sampled_target_separator_tokens": c["target_separator_tokens"],
+                    "requested_loss_tokens": (budget if budget is not None else total)
+                    * sampler.mixture["target_loss_token_share"][s],
+                    "share_error": abs(
+                        (c["loss_tokens"] / total if total else 0)
+                        - sampler.mixture["target_loss_token_share"][s]
+                    ),
                     **(
                         {
                             **{
@@ -304,6 +373,17 @@ class Exposure:
                                 for k, v in self.unique[s].items()
                             },
                             "sampled_truncated": c["truncated"],
+                            "consumed_independent_event_groups": len(
+                                self.events.get(s, ())
+                            ),
+                            "repeat_sample_exposures": c["samples"]
+                            - self.unique[s]["samples"],
+                            "max_sample_repeats_observed": c[
+                                "max_sample_repeats_observed"
+                            ],
+                            "max_target_repeats_observed": c[
+                                "max_target_repeats_observed"
+                            ],
                             "unconsumed_unique_samples": sampler.statistics[s][
                                 "samples"
                             ]
@@ -335,13 +415,35 @@ def projected_exposure(loader, runtime, schedule):
             if not window:
                 break
             report.observe(
-                loader.dataset[i]["trace"] for indices in window for i in indices
+                (loader.dataset[i]["trace"] for indices in window for i in indices),
+                microbatches=len(window),
+                accumulation=runtime["gradient_accumulation_steps"],
             )
         if report.updates >= schedule["planned_training_steps"]:
             break
     limited = schedule["planned_training_steps"] < schedule["total_possible_steps"]
+    aggregate = report.report()
+    if (
+        runtime.get("require_exact_token_budget")
+        and aggregate["unused_budget_loss_tokens"] != 0
+    ):
+        raise ValueError(
+            f"Exact token budget not met: {aggregate['loss_tokens']}/{sampler.token_budget}; "
+            "adjust budget, repeat/exposure caps, or max_steps."
+        )
+    tolerance = runtime.get("sampling_max_share_error")
+    if tolerance is not None:
+        errors = {
+            s: row["share_error"]
+            for s, row in aggregate["sources"].items()
+            if row["share_error"] > tolerance + 1e-12
+        }
+        if errors:
+            raise ValueError(
+                f"Sampling share error exceeds tolerance: {errors}; adjust budget or mixture."
+            )
     return {
-        **report.report(),
+        **aggregate,
         "run_stop_reason": "max_steps"
         if limited
         else (

@@ -1,0 +1,429 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lm_trainer:memory-import:v1",
+  "title": "Trusted local Task D import bundle structure",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "scopes",
+    "events",
+    "revoked_event_ids"
+  ],
+  "properties": {
+    "schema": {
+      "const": "lm_trainer.memory-import.v1"
+    },
+    "scopes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/scope"
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    },
+    "revoked_event_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope_id",
+        "namespace",
+        "purpose",
+        "kind"
+      ],
+      "properties": {
+        "scope_id": {
+          "$ref": "#/$defs/id"
+        },
+        "namespace": {
+          "$ref": "#/$defs/id"
+        },
+        "purpose": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "group",
+            "workbench"
+          ]
+        },
+        "channel": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "client_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "room_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "thread_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "web_account": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "kind": {
+              "const": "group"
+            },
+            "channel": {
+              "$ref": "#/$defs/id"
+            },
+            "client_id": {
+              "$ref": "#/$defs/id"
+            },
+            "room_id": {
+              "$ref": "#/$defs/id"
+            },
+            "thread_id": {
+              "$ref": "#/$defs/id"
+            },
+            "web_account": {
+              "type": "null"
+            },
+            "session_id": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "channel",
+            "client_id",
+            "room_id",
+            "thread_id"
+          ]
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "workbench"
+            },
+            "channel": {
+              "type": "null"
+            },
+            "client_id": {
+              "type": "null"
+            },
+            "room_id": {
+              "type": "null"
+            },
+            "thread_id": {
+              "type": "null"
+            },
+            "web_account": {
+              "$ref": "#/$defs/id"
+            },
+            "session_id": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "web_account",
+            "session_id"
+          ]
+        }
+      ]
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "event_id",
+        "namespace",
+        "kind",
+        "facts",
+        "fact_type",
+        "uncertainty",
+        "event_time",
+        "recorded_at",
+        "version",
+        "status",
+        "supersedes",
+        "content_hash",
+        "sources",
+        "entity_ids",
+        "scope_ids",
+        "purpose",
+        "read",
+        "train",
+        "group_disclose",
+        "index"
+      ],
+      "properties": {
+        "schema": {
+          "const": "lm_trainer.memory-event.v1"
+        },
+        "event_id": {
+          "$ref": "#/$defs/id"
+        },
+        "namespace": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "device_spec",
+            "incident_fact",
+            "troubleshooting_note",
+            "plan",
+            "shift_log",
+            "historical_judgment",
+            "confirmed_fact"
+          ]
+        },
+        "facts": {
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 320
+          },
+          "minItems": 1
+        },
+        "fact_type": {
+          "$ref": "#/$defs/id"
+        },
+        "uncertainty": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "event_time": {
+          "anyOf": [
+            {
+              "const": "unknown"
+            },
+            {
+              "type": "string",
+              "format": "date-time"
+            }
+          ]
+        },
+        "recorded_at": {
+          "anyOf": [
+            {
+              "const": "unknown"
+            },
+            {
+              "type": "string",
+              "format": "date-time"
+            }
+          ]
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "status": {
+          "enum": [
+            "active",
+            "superseded",
+            "revoked"
+          ]
+        },
+        "supersedes": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9223372036854775807
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sources": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/source"
+          },
+          "minItems": 1
+        },
+        "entity_ids": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
+        "scope_ids": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
+        "purpose": {
+          "$ref": "#/$defs/id"
+        },
+        "read": {
+          "type": "boolean"
+        },
+        "train": {
+          "type": "boolean"
+        },
+        "group_disclose": {
+          "type": "boolean"
+        },
+        "index": {
+          "type": "boolean"
+        },
+        "terms": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "aliases": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/alias"
+          }
+        },
+        "related_event_ids": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "source_ref",
+        "char_start",
+        "char_end",
+        "content_hash",
+        "origin"
+      ],
+      "properties": {
+        "source_id": {
+          "$ref": "#/$defs/id"
+        },
+        "source_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "char_start": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "char_end": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "origin": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "alias": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text",
+        "entity_id"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "entity_id": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    }
+  }
+}

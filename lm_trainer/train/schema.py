@@ -13,10 +13,22 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from lm_trainer.config.common import asset_path
+from lm_trainer.conversation import (
+    RENDERER_VERSION,
+    WINDOW_SCHEMA,
+    ConversationError,
+    adapt_window,
+    parse_catalog,
+    render_observation,
+    validate_route,
+)
+from lm_trainer.conversation.contract import HOLD_VIEWS, Window
+from lm_trainer.conversation.renderer import target_turn
 from lm_trainer.template_policy import validate_policy
 
 CORPUS_SCHEMA = "lm_trainer.corpus.v1"
 RELEASE_SCHEMA = "lm_trainer.release.v1"
+CONVERSATION_RELEASE_SCHEMA = "lm_trainer.release.v2"
 GROUP_SCHEMA = "lm_trainer.source-groups.v1"
 INDEX_SCHEMA = "lm_trainer.source-index.v1"
 OBJECTIVES = {"causal_text": "cpt", "assistant_only_messages": "sft"}
@@ -113,13 +125,30 @@ def configure_data(runtime):
         not isinstance(schemas, list)
         or not schemas
         or any(
-            not isinstance(name, str) or not re.fullmatch(r"[\w.-]+\.v1", name)
+            not isinstance(name, str)
+            or (
+                name != WINDOW_SCHEMA
+                and (
+                    name.startswith("conversation.stage3.structured.")
+                    or not re.fullmatch(r"[\w.-]+\.v1", name)
+                )
+            )
             for name in schemas
         )
         or len(set(schemas)) != len(schemas)
     ):
         raise ValueError(
-            "corpus_schema_allowlist must contain unique compatible v1 aliases"
+            "corpus_schema_allowlist must contain unique compatible v1 aliases or the registered v3 window"
+        )
+    if WINDOW_SCHEMA in schemas and (
+        schemas != [WINDOW_SCHEMA] or objective != "assistant_only_messages"
+    ):
+        raise ValueError(
+            "v3 windows require an explicit, standalone structured SFT allowlist"
+        )
+    if WINDOW_SCHEMA in schemas and runtime.get("backend", "hf") != "hf":
+        raise ValueError(
+            "v3 conversation backend requires HF; Unsloth parity has not been verified"
         )
     if not legacy:
         options["corpus_schema_allowlist"] = schemas
@@ -406,6 +435,7 @@ class Sample:
     path: str
     line: int
     characters: int
+    conversation: Window | None = None
 
     def fail(self, reason):
         raise DataContractError(
@@ -543,6 +573,174 @@ def _source_index(payload, path):
     return index
 
 
+def _conversation_bundle(data, root, seen, ledger, index, fixture, split):
+    """Strict additions for release v2; all auxiliary bytes pass the v1 hash gate."""
+
+    def read(key, *, jsonl=False):
+        spec = data.get(key)
+        raw = _verified_file(root, spec, seen)
+        if jsonl:
+            return [row for _, row in _rows(raw, spec["path"])]
+        return _read_json(_decode(raw, spec["path"]), spec["path"])
+
+    raw = read("conversation_source")
+    if not isinstance(raw, dict) or raw.get("fixture_only") is not fixture:
+        raise DataContractError(
+            "conversation source fixture scope disagrees with release v2"
+        )
+    if raw.get("split") != split:
+        raise DataContractError(
+            "conversation source catalog must be for the requested split"
+        )
+    try:
+        catalog = parse_catalog(raw)
+    except ConversationError as exc:
+        raise DataContractError(
+            str(exc), path=data["conversation_source"]["path"]
+        ) from None
+    routes = read("routing", jsonl=True)
+    splits = data.get("partition_splits")
+    declared = {entry["split"] for entry in ledger.values()}
+    if (
+        not _ids(splits)
+        or set(splits) != declared
+        or split not in declared
+        or not fixture
+        and ("train" not in declared or not declared.intersection(("dev", "test")))
+    ):
+        raise DataContractError(
+            "incomplete or conflicting source-group partition allocation"
+        )
+    allocations, group_splits = {}, {}
+    ledger_keys = {
+        "schema",
+        "id",
+        "kind",
+        "event_group",
+        "target_person",
+        "source_ids",
+        "split",
+    }
+    for entry in ledger.values():
+        if (
+            set(entry) != ledger_keys
+            or entry["kind"] != "sft"
+            or entry["target_person"] != data["target_person"]
+        ):
+            raise DataContractError(
+                "structured source-group ledger must contain only partition metadata"
+            )
+        group, assigned = entry["event_group"], entry["split"]
+        group_splits[group] = assigned
+        for sid in entry["source_ids"]:
+            allocations[sid] = (group, assigned)
+            # Foreign split payloads are deliberately not opened by preflight.
+            if assigned == split:
+                conv = catalog.by_source.get(sid)
+                if not conv or conv.event_group != group:
+                    raise DataContractError(
+                        "source-group allocation disagrees with source catalog"
+                    )
+    for conv in catalog.conversations.values():
+        allocated = group_splits.get(conv.event_group)
+        if allocated != split or any(
+            sid in allocations and allocations[sid] != (conv.event_group, split)
+            for sid in conv.events
+        ):
+            raise DataContractError(
+                "conversation catalog contains foreign or unassigned source groups"
+            )
+    if not fixture and index is None:
+        raise DataContractError("release v2 requires an independent source_index")
+    if index is not None:
+        index_keys = {
+            "schema",
+            "source_id",
+            "disposition",
+            "event_group",
+            "split",
+            "review_status",
+            "candidate_status",
+            "owner_review_only",
+            "training_authorized",
+            "permissions",
+            "approval_ref",
+        }
+        if any(
+            set(item) - index_keys
+            or (
+                isinstance(item.get("permissions"), dict)
+                and set(item["permissions"]) != {"local_review", "train", "external"}
+            )
+            for item in index.values()
+        ):
+            raise DataContractError(
+                "structured source_index must contain only allocation and approval metadata"
+            )
+    if not fixture:
+        if index.keys() != allocations.keys():
+            raise DataContractError(
+                "formal source_index and partition ledger must have exact source coverage"
+            )
+        for sid, (group, assigned) in allocations.items():
+            item = index[sid]
+            if (
+                item.get("disposition") not in ("S", "F")
+                or item.get("split") != assigned
+                or item.get("event_group") != group
+                or item.get("review_status") != "approved"
+                or not _approval_flags(item)
+                or item.get("training_authorized") is not True
+                or not _train_permissions(item.get("permissions"))
+            ):
+                raise DataContractError(
+                    "missing independent approval or split for a source"
+                )
+    return catalog, routes
+
+
+def _conversation_record(sample, catalog, data, kind, split, fixture):
+    row, error = sample.row, sample.fail
+    if (
+        row.get("schema") != WINDOW_SCHEMA
+        or kind != "sft"
+        or row.get("kind") != "sft"
+        or row.get("target_person") != data["target_person"]
+        or row.get("fixture_only") is not fixture
+        or row.get("scope") != data["scope"]
+        or row.get("training_authorized") is not (not fixture)
+        or row.get("disposition") != ("adapter_candidate" if fixture else "approved")
+        or not fixture
+        and not nonblank(row.get("approval_ref"))
+        or row.get("candidate_status") != "approved"
+        or "text" in row
+    ):
+        error("structured record has incompatible schema, scope or training approval")
+    # Explicit fixture-only authorization for the test path, never for a release.
+    _permitted({**row, "training_authorized": True}, error, split)
+    if row.get("view") in HOLD_VIEWS:
+        error("hold: opening or continuation is not standard SFT")
+    canonical_ref = data.get("source_index", data["conversation_source"])["path"]
+    if row.get("source_index_ref") != canonical_ref:
+        error("structured record must name its verified source index")
+    try:
+        window = adapt_window(row, catalog)
+        for block in window.opportunities:
+            target_turn(block)
+            render_observation(
+                window.observation(block[0].source_id), window.target_person, None
+            )
+    except ConversationError as exc:
+        error(str(exc))
+    if row.get("event_group") != window.conversation.event_group:
+        error("window event_group disagrees with its source catalog")
+    if "source_ids" in row and (
+        not _ids(row["source_ids"]) or set(row["source_ids"]) != set(window.timeline)
+    ):
+        error("record source_ids do not close the structured timeline")
+    return window
+
+
 def preflight_data(runtime, *, split="train"):
     """Authenticate exact parsed bytes once; return a plan and validated in-memory samples."""
     if split not in ("train", "dev"):
@@ -555,6 +753,7 @@ def preflight_data(runtime, *, split="train"):
 
     manifest = Path(options.pop("manifest_path"))
     fixture = options["data_mode"] == "fixture"
+    v3 = options["corpus_schema_allowlist"] == [WINDOW_SCHEMA]
     try:
         if manifest.is_symlink() or not manifest.is_file():
             raise OSError
@@ -566,7 +765,7 @@ def preflight_data(runtime, *, split="train"):
     data = _read_json(_decode(payload, "manifest_path"), "manifest_path")
     if (
         not isinstance(data, dict)
-        or data.get("schema") != RELEASE_SCHEMA
+        or data.get("schema") != (CONVERSATION_RELEASE_SCHEMA if v3 else RELEASE_SCHEMA)
         or data.get("scope") != options["data_mode"]
         or data.get("fixture_only") is not fixture
         or data.get("training_authorized") is not (not fixture)
@@ -604,6 +803,12 @@ def preflight_data(runtime, *, split="train"):
             _verified_file(root, index_spec, seen), index_spec["path"]
         )
 
+    catalog, routes = (
+        _conversation_bundle(data, root, seen, ledger, index, fixture, split)
+        if v3
+        else (None, None)
+    )
+    windows = []
     all_ids, cpt_ids, target_ids = set(), set(), set()
     by_kind = defaultdict(lambda: defaultdict(list))
     files = []
@@ -631,14 +836,23 @@ def preflight_data(runtime, *, split="train"):
             raise DataContractError("record count mismatch", path=name)
         for line, row in rows:
             sample = Sample(row, source, name, line, 0)
-            source_ids, selected, chars = _record(
-                row,
-                kind=kind,
-                target=data["target_person"],
-                schemas=options["corpus_schema_allowlist"],
-                error=sample.fail,
-                split=split,
-            )
+            window = None
+            if v3:
+                window = _conversation_record(
+                    sample, catalog, data, kind, split, fixture
+                )
+                windows.append(window)
+                source_ids, selected = set(window.timeline), set(window.targets)
+                chars = sum(len(m["content"]) for m in row["messages"])
+            else:
+                source_ids, selected, chars = _record(
+                    row,
+                    kind=kind,
+                    target=data["target_person"],
+                    schemas=options["corpus_schema_allowlist"],
+                    error=sample.fail,
+                    split=split,
+                )
             if row.get("fixture_only", fixture) is not fixture:
                 sample.fail("record fixture_only does not agree with manifest scope")
             if row["id"] in all_ids:
@@ -667,7 +881,8 @@ def preflight_data(runtime, *, split="train"):
                 target_ids.update(selected)
                 policy = options["template_policy"]
                 if (
-                    policy is not None
+                    not v3
+                    and policy is not None
                     and row["messages"][0]["role"] == "system"
                     and (row["messages"][0]["content"] != policy["system_prompt"])
                 ):
@@ -679,13 +894,26 @@ def preflight_data(runtime, *, split="train"):
             ids_by_source[kind, source].update(
                 selected if kind == "sft" else source_ids
             )
-            by_kind[kind][source].append(Sample(row, source, name, line, chars))
+            by_kind[kind][source].append(Sample(row, source, name, line, chars, window))
         files.append(
             {
                 k: spec[k]
                 for k in ("path", "sha256", "kind", "source", "records", "split")
             }
         )
+
+    if v3:
+        if all_ids != {key for key, row in ledger.items() if row["split"] == split}:
+            raise DataContractError(
+                "release windows do not cover their complete split allocation"
+            )
+        try:
+            if set(validate_route(windows, routes)) != all_ids:
+                raise ConversationError(
+                    "release files must contain only default routing windows"
+                )
+        except ConversationError as exc:
+            raise DataContractError(str(exc), path=data["routing"]["path"]) from None
 
     kind = OBJECTIVES[options["objective"]]
     available = by_kind[kind]
@@ -705,6 +933,22 @@ def preflight_data(runtime, *, split="train"):
         {
             **options,
             "plan_schema": "lm_trainer.stage-data.v1",
+            **(
+                {
+                    "release_schema": CONVERSATION_RELEASE_SCHEMA,
+                    "renderer_version": RENDERER_VERSION,
+                    "partition_splits": data["partition_splits"],
+                    "partition_sha256": data["source_group_manifest"]["sha256"].lower(),
+                    "source_index_sha256": data["source_index"]["sha256"].lower()
+                    if "source_index" in data
+                    else None,
+                    "conversation_source_sha256": data["conversation_source"][
+                        "sha256"
+                    ].lower(),
+                }
+                if v3
+                else {}
+            ),
             "sources": sources,
             "seed": runtime.get("seed", 42),
             "max_length": runtime.get("max_length"),

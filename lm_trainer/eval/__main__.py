@@ -6,6 +6,7 @@ Subcommands
 ``run``        run fixed-history / rollout evaluation for one or more models
 ``cards``      run the M0–M4 context-card experiment
 ``blind``      build an anonymous blind-review pack from a finished run
+``review``     submit a private anonymous review with dimension reasons
 ``reveal``     join reviews with the private map and print a reveal summary
 ``report``     export JSON/JSONL/CSV/Markdown/HTML reports
 """
@@ -25,6 +26,7 @@ from lm_trainer.eval.blind import (
     reveal,
     save_blind_pack,
     save_reveal_summary,
+    submit_review,
 )
 from lm_trainer.eval.cards import build_conditions, load_card_fixture
 from lm_trainer.eval.provider import (
@@ -107,6 +109,13 @@ def _parser() -> argparse.ArgumentParser:
     blind.add_argument("--run", required=True, type=Path, help="run.json")
     blind.add_argument("--output", required=True, type=Path)
     blind.add_argument("--seed", type=int, default=2026)
+    blind.add_argument("--pair", nargs=2, metavar=("LEFT_CANDIDATE", "RIGHT_CANDIDATE"),
+                       help="Select exactly two models; actual left/right remains blinded.")
+
+    review = sub.add_parser("review", help="submit scores and per-dimension reasons from JSON")
+    review.add_argument("--pack", required=True, type=Path)
+    review.add_argument("--reviews", required=True, type=Path)
+    review.add_argument("--entry", required=True, type=Path)
 
     reveal_p = sub.add_parser("reveal", help="reveal a blind pack")
     reveal_p.add_argument("--pack", required=True, type=Path)
@@ -185,6 +194,8 @@ def main(argv=None) -> int:
             return _cards(args)
         if args.command == "blind":
             return _blind(args)
+        if args.command == "review":
+            return _review(args)
         if args.command == "reveal":
             return _reveal(args)
         if args.command == "report":
@@ -307,15 +318,14 @@ def _cards(args) -> int:
 
 def _blind(args) -> int:
     payload = json.loads(args.run.read_text(encoding="utf-8"))
-    prompts = {}
-    for record in payload.get("records", []):
-        text = record.get("prompt") or ""
-        if text and len(text) > len(prompts.get(record["case_id"], "")):
-            prompts[record["case_id"]] = text
+    records = payload.get("records", [])
+    if args.pair:
+        if len(set(args.pair)) != 2:
+            raise EvalError("BLIND_INVALID", "--pair requires two different candidates")
+        records = [record for record in records if record["model_id"] in args.pair]
     pack, private = make_blind_pack(
-        payload.get("records", []),
+        records,
         seed=args.seed,
-        prompts=prompts,
         mode=payload.get("mode", "mock"),
     )
     pack_path, map_path = save_blind_pack(pack, private, args.output)
@@ -331,6 +341,21 @@ def _blind(args) -> int:
             ensure_ascii=False,
         )
     )
+    return 0
+
+
+def _review(args) -> int:
+    try:
+        entry = json.loads(args.entry.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise EvalError("REVIEW_INVALID", "cannot read review JSON") from exc
+    required = {"item_id", "choice"}
+    if (not isinstance(entry, dict) or not required <= entry.keys()
+        or entry.keys() - required - {"scores", "dimension_reasons", "reason", "reviewer"}
+        or any(not isinstance(entry[k], str) for k in required | ({"reason", "reviewer"} & entry.keys()))):
+        raise EvalError("REVIEW_INVALID", "invalid review entry fields")
+    record = submit_review(load_blind_pack(args.pack), args.reviews, **entry)
+    print(json.dumps({"status": "PASS", "item_id": record.item_id}))
     return 0
 
 

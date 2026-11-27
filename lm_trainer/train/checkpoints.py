@@ -63,7 +63,7 @@ def training_state(
     dev_history,
 ):
     return {
-        "version": 1,
+        "version": 2,
         "identity": identity,
         "run_id": manifest["run_id"],
         "optimizer_updates": len(updates),
@@ -99,7 +99,7 @@ def restore_training(
     state = torch.load(directory / STATE, weights_only=True, map_location="cpu")
     completed = manifest["optimizer_updates"]
     if (
-        state["version"] != 1
+        state["version"] != 2
         or state["identity"] != identity
         or state["run_id"] != manifest["run_id"]
         or state["optimizer_updates"] != completed

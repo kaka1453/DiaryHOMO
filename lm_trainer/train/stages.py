@@ -47,6 +47,42 @@ def artifact_reference(runtime):
     return path, manifest, sha
 
 
+def data_lineage(plan, reference):
+    """Carry forward known release IDs; forbid mixing known versions of a lineage."""
+    current = {
+        "release_id": plan["release_id"],
+        "parent_version": plan["parent_version"],
+        "manifest_sha256": plan["manifest_sha256"],
+    }
+    if not reference:
+        return [current]
+    history = reference.get("data_lineage") or [
+        {
+            "release_id": reference["data_release_id"],
+            "parent_version": None,
+            "manifest_sha256": reference["manifest_sha256"],
+        }
+    ]
+    release, parent = current["release_id"], current["parent_version"]
+    # Some old manifests use sentinel parent_version values for a root release.
+    roots = {None, "none", "root", "initial"}
+    known = False
+    for item in history:
+        old, old_parent = item["release_id"], item["parent_version"]
+        if current["manifest_sha256"] == item["manifest_sha256"]:
+            known = True
+        elif (
+            release == old
+            or parent == old
+            or old_parent == release
+            or (parent == old_parent and parent not in roots)
+        ):
+            raise ValueError(
+                "Cannot combine different manifest versions of a known data lineage."
+            )
+    return history if known and current in history else [*history, current]
+
+
 def dev_preflight(runtime, validated):
     if not runtime.get("dev_manifest_path"):
         return None
@@ -66,6 +102,17 @@ def dev_preflight(runtime, validated):
         or validated.plan["target_person"] != dev.plan["target_person"]
     ):
         raise ValueError("Dev target mismatch or train/dev event or source_id overlap.")
+    if validated.plan.get("renderer_version") is not None and any(
+        validated.plan.get(key) != dev.plan.get(key)
+        for key in (
+            "partition_sha256",
+            "source_index_sha256",
+            "renderer_version",
+        )
+    ):
+        raise ValueError(
+            "Train/dev structured releases must share one partition ledger and source index."
+        )
     return dev
 
 
@@ -145,8 +192,14 @@ class Stage:
             "compute_dtype": runtime["compute_dtype"],
             "backend": runtime["backend"],
             "data_release_id": plan["release_id"],
+            "data_lineage": data_lineage(plan, self.reference),
             "manifest_sha256": plan["manifest_sha256"],
             "split": "train",
+            **(
+                {"renderer_version": plan["renderer_version"]}
+                if "renderer_version" in plan
+                else {}
+            ),
             "data_mode": plan["data_mode"],
             "fixture_only": plan["fixture_only"],
             "parent_adapter_sha256": self.reference["parent_adapter_sha256"]
@@ -163,8 +216,19 @@ class Stage:
             tokenizer_hash=tokenizer_hash(tokenizer),
             template_policy=policy_identity(tokenizer, self.runtime),
         )
+        if "renderer_version" in self.manifest:
+            from lm_trainer.train.encoding import conversation_identity
+
+            _, policy = resolve_policy(tokenizer, self.runtime["template_policy"])
+            self.manifest["conversation_renderer"] = conversation_identity(policy)
         if self.reference:
             require_compatible(self.reference, self.manifest)
+            old_renderer = self.reference.get("conversation_renderer")
+            new_renderer = self.manifest.get("conversation_renderer")
+            if old_renderer and new_renderer and old_renderer != new_renderer:
+                raise ValueError(
+                    "Incompatible parent/checkpoint conversation renderer."
+                )
 
     def identify_plan(self, loader, schedule):
         self.identity = {
@@ -182,6 +246,7 @@ class Stage:
                 "compute_dtype",
                 "backend",
                 "data_release_id",
+                "data_lineage",
                 "manifest_sha256",
                 "split",
                 "fixture_only",
@@ -190,6 +255,10 @@ class Stage:
                 "environment",
             )
         }
+        if "conversation_renderer" in self.manifest:
+            self.identity["conversation_renderer"] = self.manifest[
+                "conversation_renderer"
+            ]
         self.identity.update(
             {
                 "schedule": schedule,

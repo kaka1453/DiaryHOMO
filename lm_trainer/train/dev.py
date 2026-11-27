@@ -8,18 +8,13 @@ def evaluate_dev(stage, model, tokenizer, accelerator):
     import torch
 
     from lm_trainer.template_policy import chat_template_kwargs, resolve_policy
-    from lm_trainer.train.data import (
-        DataCollatorForCausalLMWith8xPadding,
-        load_training_dataset,
-    )
+    from lm_trainer.train.data import DataCollatorForCausalLMWith8xPadding
 
     model.eval()
     result = {}
     with torch.inference_mode():
         if stage.dev is not None:
-            dataset = load_training_dataset(
-                stage.runtime, tokenizer, validated=stage.dev
-            )
+            dataset = stage.encoded_dev
             collate = DataCollatorForCausalLMWith8xPadding(
                 tokenizer, stage.runtime["max_length"], False
             )

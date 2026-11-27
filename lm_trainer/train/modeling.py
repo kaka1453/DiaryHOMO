@@ -263,6 +263,19 @@ def tensor_fingerprint(tensors):
 
 
 def check_trainable(model, runtime):
+    from lm_trainer.train.artifacts import lora_identity
+
+    config = model.peft_config["default"]
+    if lora_identity(runtime) != {
+        "r": config.r,
+        "alpha": config.lora_alpha,
+        "dropout": config.lora_dropout,
+        "bias": config.bias,
+        "target_modules": sorted(config.target_modules),
+    }:
+        raise ValueError(
+            "Loaded LoRA structure does not match target modules, rank and alpha."
+        )
     active = model.active_adapters
     if active != ["default"] or set(model.peft_config) != {"default"}:
         raise ValueError("Stage requires exactly one active, unmerged default adapter.")
@@ -280,10 +293,14 @@ def check_trainable(model, runtime):
         )
     if any(getattr(m, "merged", False) for m in model.modules()):
         raise ValueError("Merged adapters are prohibited in stage training.")
+    dtypes = sorted({str(p.dtype) for p in trainable.values()})
+    if runtime["backend"] == "hf" and dtypes != ["torch.float32"]:
+        raise ValueError("HF staged LoRA requires FP32 trainable adapter tensors.")
     total = sum(p.numel() for p in model.parameters())
     count = sum(p.numel() for p in trainable.values())
     return {
         "trainable": count,
+        "adapter_dtypes": dtypes,
         "total_parameter_elements": total,
         "fraction": count / total,
         "target_modules": sorted(runtime["lora_target_modules"]),

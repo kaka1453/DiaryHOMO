@@ -18,6 +18,7 @@ from lm_trainer.train.artifacts import (
     tokenizer_hash,
     verify_artifact,
 )
+from lm_trainer.train.encoding import conversation_identity
 from lm_trainer.train.stages import policy_identity
 
 from .context import ContextBuilder
@@ -90,6 +91,7 @@ class VerifiedModel:
     policy: dict[str, Any]
     context_limit: int
     warmup_ids: list[int]
+    conversation_renderer: dict[str, str] | None = None
 
 
 def _validate_base_headers(base, fingerprint):
@@ -278,6 +280,7 @@ class ModelRegistry:
                 raise ValueError
         except Exception:
             raise ChatError("TEMPLATE_UNSUPPORTED") from None
+        renderer = None
         if manifest is not None:
             try:
                 adapter_tok = AutoTokenizer.from_pretrained(
@@ -292,9 +295,13 @@ class ModelRegistry:
                     != manifest["template_policy"]
                 ):
                     raise ValueError
+                if "conversation_renderer" in manifest:
+                    renderer = conversation_identity(resolved)
+                    if manifest["conversation_renderer"] != renderer:
+                        raise ValueError
             except Exception:
                 raise ChatError("ARTIFACT_MISMATCH") from None
-        return VerifiedModel(spec, tokenizer, resolved, limit, warmup)
+        return VerifiedModel(spec, tokenizer, resolved, limit, warmup, renderer)
 
 
 def load_roles(path: Path | str) -> tuple[RoleConfig, ...]:
