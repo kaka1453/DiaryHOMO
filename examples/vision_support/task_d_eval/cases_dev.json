@@ -1,0 +1,412 @@
+{
+  "schema": "lm_trainer.eval-cases.v1",
+  "fixture_only": true,
+  "split": "dev",
+  "generated_by": "Task D fictional fixture generator",
+  "manifest": {
+    "schema": "lm_trainer.eval-manifest.v1",
+    "contract": "lm_trainer.eval.v1",
+    "split": "dev",
+    "fixture_only": true,
+    "case_count": 10,
+    "purpose": "fictional vision-support evaluation only",
+    "cases": [
+      {
+        "case_id": "vision-eval-001",
+        "split": "dev",
+        "sha256": "18710ca74414662af9eda52f7543912e07e24abf16b185164dce67a6f0594dbc"
+      },
+      {
+        "case_id": "vision-eval-002",
+        "split": "dev",
+        "sha256": "79df6b7460734338278e20b040d2cf05117164baeb31feb6c4a678d007063240"
+      },
+      {
+        "case_id": "vision-eval-003",
+        "split": "dev",
+        "sha256": "6d8778060f77747d199c1aeb5cb2436e18bb7ae3f8e109def279bb103e4d9218"
+      },
+      {
+        "case_id": "vision-eval-004",
+        "split": "dev",
+        "sha256": "3d07b0a0df057757b445fc46c14b00b343eb59bfe3ca21f76539981d7ec3c667"
+      },
+      {
+        "case_id": "vision-eval-005",
+        "split": "dev",
+        "sha256": "6b89aec0b4260e46029f8fdf98d28a96f460f1329e0a7a8dd567dc4c028214ee"
+      },
+      {
+        "case_id": "vision-eval-006",
+        "split": "dev",
+        "sha256": "a04be507d0136bc4786f4a539c7f9d5415b3a1f8c27760805275f2a2f223041e"
+      },
+      {
+        "case_id": "vision-eval-007",
+        "split": "dev",
+        "sha256": "ce12e0754339a00136c42f37d7f3d063f424f833d3cebfdf790e44a2bd019e69"
+      },
+      {
+        "case_id": "vision-eval-008",
+        "split": "dev",
+        "sha256": "5270d8710dc724f9b24bb45d2f10de741b3ecdb2cdbdcb20e9aa0535b5041ae4"
+      },
+      {
+        "case_id": "vision-eval-009",
+        "split": "dev",
+        "sha256": "04584cd66b7f533fd8c726459c2b27caefc5221c28326523c50d714555b02b14"
+      },
+      {
+        "case_id": "vision-eval-010",
+        "split": "dev",
+        "sha256": "69e4db2602ca26c9d686d4887810f2d0928c9f9634ac1c826975412648999995"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "schema": "lm_trainer.eval.v1",
+      "case_id": "vision-eval-001",
+      "target_person": "CS_AGENT",
+      "event_group": "demo:vision:trigger",
+      "split": "dev",
+      "fixture_only": true,
+      "kind": "fixed_history",
+      "messages": [
+        {
+          "role": "user",
+          "content": "外触发模式下传送带提速后开始漏拍。"
+        },
+        {
+          "role": "assistant",
+          "content": "先确认一下触发计数和实际采集帧数是否一致。"
+        },
+        {
+          "role": "user",
+          "content": "触发计数1200，实际只有1168帧，曝光目前是5ms。"
+        }
+      ],
+      "rubric": [
+        "先区分采集链路与识别漏检",
+        "给出可执行的曝光/触发就绪检查步骤",
+        "不编造未给出的硬件型号参数"
+      ],
+      "reference_only": [
+        "先看触发计数与实际采集帧数差异（1200 vs 1168，少 32 帧），区分是相机没收到触发、触发被丢弃还是采集后漏存；再检查曝光 5ms 是否与当前节拍匹配、触发就绪（trigger ready）信号是否稳定，最后用固定样件验证。"
+      ],
+      "memory_condition": "M0"
+    },
+    {
+      "schema": "lm_trainer.eval.v1",
+      "case_id": "vision-eval-002",
+      "target_person": "CS_AGENT",
+      "event_group": "demo:vision:exposure",
+      "split": "dev",
+      "fixture_only": true,
+      "kind": "fixed_history",
+      "messages": [
+        {
+          "role": "user",
+          "content": "更换镜头后图像整体偏暗，曝光已经加到8ms还是偏暗。"
+        },
+        {
+          "role": "assistant",
+          "content": "确认一下光源和镜头光圈，另外光圈是手动还是自动？"
+        },
+        {
+          "role": "user",
+          "content": "光源是环形光，亮度调到80%了，镜头是手动光圈。"
+        }
+      ],
+      "rubric": [
+        "先区分光源/光圈/曝光三要素",
+        "给出按顺序的可执行排查步骤",
+        "不臆测未给出的相机型号"
+      ],
+      "reference_only": [
+        "手动光圈先确认实际光圈值是否被误调小；环形光 80% 需检查是否频闪、衰减或角度问题；曝光 8ms 在当前节拍下是否允许更长曝光；最后用灰度样件测均匀性与亮度。"
+      ],
+      "memory_condition": "M0"
+    },
+    {
+      "schema": "lm_trainer.eval.v1",
+      "case_id": "vision-eval-003",
+      "target_person": "CS_AGENT",
+      "event_group": "demo:vision:trigger",
+      "split": "dev",
+      "fixture_only": true,
+      "kind": "multi_turn_rollout",
+      "messages": [
+        {
+          "role": "user",
+          "content": "工位相机偶尔漏拍，怎么排查？"
+        },
+        {
+          "role": "assistant",
+          "content": "先确认漏拍是随机还是固定节拍。"
+        },
+        {
+          "role": "user",
+          "content": "提速后更明显，触发计数正常。"
+        },
+        {
+          "role": "assistant",
+          "content": "采集侧先看实际存图数量。"
+        },
+        {
+          "role": "user",
+          "content": "存图少了大概3%，曝光时间5ms。"
+        }
+      ],
+      "rubric": [
+        "第一轮先区分采集与识别",
+        "信息变化后修正判断",
+        "不编造未给出的参数"
+      ],
+      "reference_only": [
+        "先按采集链路排查：触发信号、相机就绪、存图数量；提速后漏拍变多优先怀疑曝光 5ms 与节拍不匹配，或触发上升沿与相机就绪窗口冲突。"
+      ],
+      "memory_condition": "M0"
+    },
+    {
+      "schema": "lm_trainer.eval.v1",
+      "case_id": "vision-eval-004",
+      "target_person": "CS_AGENT",
+      "event_group": "demo:vision:calibration",
+      "split": "dev",
+      "fixture_only": true,
+      "kind": "fixed_history",
+      "messages": [
+        {
+          "role": "user",
+          "content": "设备重新标定后，检测框整体向右偏了大概15个像素。"
+        },
+        {
+          "role": "assistant",
+          "content": "确认一下标定板位置和相机是否被移动过。"
+        },
+        {
+          "role": "user",
+          "content": "标定板没动，相机底座被人碰过，重新紧固了。"
+        }
+      ],
+      "rubric": [
+        "判断底座位移对标定的影响",
+        "建议重新标定并验证",
+        "不编造具体补偿数值"
+      ],
+      "reference_only": [
+        "相机底座被碰过会导致原标定失效，像素偏移 15px 是典型底座微小位移表现；紧固后需重新标定，并用标准样件复测。"
+      ],
+      "memory_condition": "M0"
+    },
+    {
+      "schema": "lm_trainer.eval.v1",
+      "case_id": "vision-eval-005",
+      "target_person": "CS_AGENT",
+      "event_group": "demo:vision:lighting",
+      "split": "dev",
+      "fixture_only": true,
+      "kind": "multi_turn_rollout",
+      "messages": [
+        {
+          "role": "user",
+          "content": "换了一批反光工件，误检率突然升高。"
+        },
+        {
+          "role": "assistant",
+          "content": "先确认误检是过曝还是边缘反光。"
+        },
+        {
+          "role": "user",
+          "content": "图像上有一片高亮，直方图右侧堆积。"
+        },
+        {
+          "role": "assistant",
+          "content": "这是过曝导致的边缘丢失。"
+        },
+        {
+          "role": "user",
+          "content": "降低光源亮度后好一些，但节拍跟不上了。"
+        }
+      ],
+      "rubric": [
+        "识别过曝主因",
+        "在亮度与节拍之间给出权衡方案",
+        "不编造未给出的相机型号"
+      ],
+      "reference_only": [
+        "过曝导致边缘丢失是主因；降亮度改善说明方向正确；节拍跟不上时应改用短曝光+高亮度脉冲或调整光源角度/漫射，而不是单纯降低亮度。"
+      ],
+      "memory_condition": "M0"
+    },
+    {
+      "schema": "lm_trainer.eval.v1",
+      "case_id": "vision-eval-006",
+      "target_person": "CS_AGENT",
+      "event_group": "demo:vision:conflict",
+      "split": "dev",
+      "fixture_only": true,
+      "kind": "fixed_history",
+      "messages": [
+        {
+          "role": "user",
+          "content": "同一工位两张工单卡都写着曝光时间，一张说5ms，一张说8ms，该信哪个？"
+        },
+        {
+          "role": "assistant",
+          "content": "先看两张卡的版本和生效时间。"
+        },
+        {
+          "role": "user",
+          "content": "一张是昨天记录的5ms，另一张是今天记录的8ms，但今天这张状态标记为未确认。"
+        }
+      ],
+      "rubric": [
+        "按版本/状态/时间判断证据优先级",
+        "明确说明不确定与需人工确认",
+        "不强行给出唯一数值"
+      ],
+      "reference_only": [
+        "应优先采用最新且已确认的版本；今天这张 8ms 若为未确认状态，不能直接覆盖已确认的 5ms，应提示人工确认并记录冲突。"
+      ],
+      "memory_condition": "M3"
+    },
+    {
+      "schema": "lm_trainer.eval.v1",
+      "case_id": "vision-eval-007",
+      "target_person": "CS_AGENT",
+      "event_group": "demo:vision:ambiguous",
+      "split": "dev",
+      "fixture_only": true,
+      "kind": "fixed_history",
+      "messages": [
+        {
+          "role": "user",
+          "content": "那个工位的相机又不准了，还是按上次的参数调一下。"
+        },
+        {
+          "role": "assistant",
+          "content": "您指的是哪个工位？上次调整的是哪个参数？"
+        },
+        {
+          "role": "user",
+          "content": "就是常用的那个工位，参数你那边应该有记录。"
+        }
+      ],
+      "rubric": [
+        "主动澄清工位与参数指代",
+        "不臆测具体工位",
+        "说明需要哪些信息才能继续"
+      ],
+      "reference_only": [
+        "应继续追问具体工位编号、上次调整记录的时间与参数项；在指代不清时不得直接套用任何工单参数。"
+      ],
+      "memory_condition": "M4"
+    },
+    {
+      "schema": "lm_trainer.eval.v1",
+      "case_id": "vision-eval-008",
+      "target_person": "CS_AGENT",
+      "event_group": "demo:vision:irrelevant",
+      "split": "dev",
+      "fixture_only": true,
+      "kind": "fixed_history",
+      "messages": [
+        {
+          "role": "user",
+          "content": "贴标机偶尔贴歪，相机有没有问题？"
+        },
+        {
+          "role": "assistant",
+          "content": "先确认相机触发与贴标动作是否同步。"
+        },
+        {
+          "role": "user",
+          "content": "同步信号看起来正常，贴标位置偏差大概2mm。"
+        }
+      ],
+      "rubric": [
+        "区分相机与贴标机构问题",
+        "不套用无关工单参数",
+        "给出可执行的验证步骤"
+      ],
+      "reference_only": [
+        "相机同步正常时，贴歪更可能是贴标机构/标签卷带张力问题；应先用静态标记验证相机检测位置，再排查机构。"
+      ],
+      "memory_condition": "M2"
+    },
+    {
+      "schema": "lm_trainer.eval.v1",
+      "case_id": "vision-eval-009",
+      "target_person": "CS_AGENT",
+      "event_group": "demo:vision:card",
+      "split": "dev",
+      "fixture_only": true,
+      "kind": "fixed_history",
+      "messages": [
+        {
+          "role": "user",
+          "content": "IRIS-7 工位改过曝光吗？"
+        },
+        {
+          "role": "assistant",
+          "content": "先确认历史变更记录。"
+        },
+        {
+          "role": "user",
+          "content": "现场只记得改过曝光，数值不清楚。"
+        }
+      ],
+      "rubric": [
+        "依据卡片事实回答相机型号/参数变更",
+        "不编造卡片外的参数",
+        "说明卡片来源与不确定性"
+      ],
+      "reference_only": [
+        "应依据工单卡说明 IRIS-7 的变更事实（由卡片提供），不得编造卡片未记录的曝光数值；若卡片未给出具体数值需明确说明。"
+      ],
+      "memory_condition": "M1"
+    },
+    {
+      "schema": "lm_trainer.eval.v1",
+      "case_id": "vision-eval-010",
+      "target_person": "CS_AGENT",
+      "event_group": "demo:vision:regression",
+      "split": "dev",
+      "fixture_only": true,
+      "kind": "multi_turn_rollout",
+      "messages": [
+        {
+          "role": "user",
+          "content": "升级软件后，原本正常的工位开始报图像尺寸不匹配。"
+        },
+        {
+          "role": "assistant",
+          "content": "先确认新版本的图像尺寸配置是否被重置。"
+        },
+        {
+          "role": "user",
+          "content": "配置里分辨率还是原来的值，但相机实际输出变了。"
+        },
+        {
+          "role": "assistant",
+          "content": "检查相机实际输出分辨率是否被固件修改。"
+        },
+        {
+          "role": "user",
+          "content": "相机固件没动过，但更换过一台备用相机。"
+        }
+      ],
+      "rubric": [
+        "定位备用相机分辨率差异",
+        "建议核对相机型号与输出设置",
+        "不编造型号"
+      ],
+      "reference_only": [
+        "更换备用相机后实际输出分辨率可能不同，应核对新相机型号与输出设置，并与软件配置对齐。"
+      ],
+      "memory_condition": "M0"
+    }
+  ]
+}

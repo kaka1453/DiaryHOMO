@@ -1,0 +1,16 @@
+[
+  {
+    "card_id": "fictional-ticket-iris", "namespace": "fixture-line-iris", "kind": "incident_fact",
+    "facts": ["虚构 IRIS-7 工位漏拍。Trigger count: 10; saved images: 8."],
+    "event_time": "2026-01-01T08:00:00+00:00", "recorded_at": "2026-01-01T08:10:00+00:00",
+    "version": 2, "status": "active", "supersedes": 1, "source_ref": "fixture:iris-7",
+    "uncertainty": "unconfirmed", "permissions": {"read": true, "train": false}, "scope": "role:CS_AGENT"
+  },
+  {
+    "card_id": "fictional-ticket-l2", "namespace": "fixture-line-iris", "kind": "troubleshooting_note",
+    "facts": ["Fictional L2: compare two test triggers under the same exposure."],
+    "event_time": "2026-01-01T08:10:00+00:00", "recorded_at": "2026-01-01T08:15:00+00:00",
+    "version": 1, "status": "active", "supersedes": null, "source_ref": "fixture:iris-l2",
+    "uncertainty": "synthetic", "permissions": {"read": true, "train": false}, "scope": "role:SUPPORT_L2"
+  }
+]

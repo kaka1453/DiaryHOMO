@@ -17,6 +17,17 @@ def sha256_file(path) -> str:
     return digest.hexdigest()
 
 
+def batch_tensor_digest(window):
+    """Hash what actually entered the model, not text or tokenizer projections."""
+    digest = hashlib.sha256()
+    for batch in window:
+        for field in ("input_ids", "attention_mask", "labels"):
+            tensor = batch[field].detach().cpu().contiguous()
+            digest.update(f"{field}:{tuple(tensor.shape)}:{tensor.dtype}:".encode())
+            digest.update(memoryview(tensor.numpy()))
+    return digest.hexdigest()
+
+
 def environment_metadata(lock_files=None) -> dict:
     package = Path(__file__).resolve().parents[1]
 
@@ -31,6 +42,8 @@ def environment_metadata(lock_files=None) -> dict:
         "unsloth-zoo",
         "triton",
         "xformers",
+        "numpy",
+        "safetensors",
     )
     versions = {}
     for name in packages:
@@ -49,6 +62,19 @@ def environment_metadata(lock_files=None) -> dict:
                 "train/bootstrap.py",
                 "train/performance.py",
                 "train/data.py",
+                "train/schema.py",
+                "train/encoding.py",
+                "train/sampling.py",
+                "train/schedule.py",
+                "train/stages.py",
+                "train/artifacts.py",
+                "train/checkpoints.py",
+                "train/dev.py",
+                "train/reproducibility.py",
+                "model/loader.py",
+                "model/quantization.py",
+                "config/stages.py",
+                "template_policy.py",
                 "config/train_config.py",
             )
         },
@@ -65,6 +91,7 @@ def summarize_updates(updates: list[dict], warmup_steps: int) -> dict:
     if not measured:
         return {
             "measured_updates": 0,
+            "measured_seconds": None,
             "seconds_per_update": None,
             "samples_per_second": None,
             "input_tokens_per_second": None,
@@ -73,10 +100,12 @@ def summarize_updates(updates: list[dict], warmup_steps: int) -> dict:
     seconds = sum(row["seconds"] for row in measured)
     result = {
         "measured_updates": len(measured),
+        "measured_seconds": seconds,
         "seconds_per_update": seconds / len(measured),
     }
     for key in ("samples", "input_tokens", "loss_tokens"):
-        result[f"{key}_per_second"] = sum(row[key] for row in measured) / seconds
+        result[f"measured_{key}"] = sum(row[key] for row in measured)
+        result[f"{key}_per_second"] = result[f"measured_{key}"] / seconds
     return result
 
 

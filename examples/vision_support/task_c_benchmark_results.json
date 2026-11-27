@@ -1,0 +1,389 @@
+{
+  "schema": "lm_trainer.chat-benchmark.v1",
+  "fixture_only": true,
+  "timestamp": "2026-11-26T21:28:36.504880+08:00",
+  "gpu": "NVIDIA GeForce RTX 3090",
+  "gpu_total_mib": 24121.1875,
+  "packages": {
+    "torch": "2.14.0+cu130",
+    "transformers": "5.17.0",
+    "accelerate": "1.15.0",
+    "peft": "0.21.1",
+    "tokenizers": "0.23.2"
+  },
+  "settings": {
+    "max_new_tokens": 16,
+    "do_sample": false,
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "top_k": 50,
+    "repetition_penalty": 1.0,
+    "seed": null
+  },
+  "initial_process_memory": {
+    "allocated_mib": 0.0,
+    "reserved_mib": 0.0
+  },
+  "models": [
+    {
+      "activation": {
+        "model_id": "base",
+        "load_ms": 4525.443156249821,
+        "warmup_ms": 1645.240318030119,
+        "resident_vram_mb": 9.51025390625
+      },
+      "after_switch": {
+        "allocated_mib": 9.51025390625,
+        "reserved_mib": 22.0
+      },
+      "cases": [
+        {
+          "history": "short",
+          "committed_prior_turns": 0,
+          "setup_failures": [],
+          "input_tokens": 163,
+          "output_tokens": 16,
+          "ttft_ms": 99.50943477451801,
+          "tokens_per_second": 165.97733074402862,
+          "latency_ms": 100.10025091469288,
+          "peak_vram_mb": 18.6787109375,
+          "finish_reason": "length",
+          "committed": true,
+          "dropped_turns": 0,
+          "error_code": null,
+          "delta_events": 1,
+          "card_audit": [],
+          "after_request": {
+            "allocated_mib": 17.63525390625,
+            "reserved_mib": 24.0
+          }
+        },
+        {
+          "history": "typical",
+          "committed_prior_turns": 2,
+          "setup_failures": [],
+          "input_tokens": 941,
+          "output_tokens": 16,
+          "ttft_ms": 77.44533382356167,
+          "tokens_per_second": 227.7973637651006,
+          "latency_ms": 78.00243142992258,
+          "peak_vram_mb": 23.640625,
+          "finish_reason": "length",
+          "committed": true,
+          "dropped_turns": 0,
+          "error_code": null,
+          "delta_events": 1,
+          "card_audit": [
+            {
+              "card_id": "fictional-ticket-l2",
+              "version": 1,
+              "reason": "scope"
+            },
+            {
+              "card_id": "fictional-ticket-iris",
+              "version": 2,
+              "reason": "injected"
+            }
+          ],
+          "after_request": {
+            "allocated_mib": 17.63525390625,
+            "reserved_mib": 30.0
+          }
+        },
+        {
+          "history": "long",
+          "committed_prior_turns": 14,
+          "setup_failures": [],
+          "input_tokens": 1905,
+          "output_tokens": 16,
+          "ttft_ms": 85.1521398872137,
+          "tokens_per_second": 236.9840967838282,
+          "latency_ms": 85.64923610538244,
+          "peak_vram_mb": 29.818359375,
+          "finish_reason": "length",
+          "committed": true,
+          "dropped_turns": 5,
+          "error_code": null,
+          "delta_events": 1,
+          "card_audit": [],
+          "after_request": {
+            "allocated_mib": 17.63525390625,
+            "reserved_mib": 52.0
+          }
+        }
+      ]
+    },
+    {
+      "activation": {
+        "model_id": "cpt_stage1",
+        "load_ms": 2015.7671952620149,
+        "warmup_ms": 8.061944507062435,
+        "resident_vram_mb": 17.64892578125
+      },
+      "after_switch": {
+        "allocated_mib": 17.64892578125,
+        "reserved_mib": 22.0
+      },
+      "cases": [
+        {
+          "history": "short",
+          "committed_prior_turns": 0,
+          "setup_failures": [],
+          "input_tokens": 163,
+          "output_tokens": 16,
+          "ttft_ms": 16.095559112727642,
+          "tokens_per_second": 211.28846858698273,
+          "latency_ms": 78.87457869946957,
+          "peak_vram_mb": 18.6923828125,
+          "finish_reason": "length",
+          "committed": true,
+          "dropped_turns": 0,
+          "error_code": null,
+          "delta_events": 4,
+          "card_audit": [],
+          "after_request": {
+            "allocated_mib": 17.64892578125,
+            "reserved_mib": 24.0
+          }
+        },
+        {
+          "history": "typical",
+          "committed_prior_turns": 2,
+          "setup_failures": [],
+          "input_tokens": 941,
+          "output_tokens": 16,
+          "ttft_ms": 21.516970358788967,
+          "tokens_per_second": 196.06534243415172,
+          "latency_ms": 88.87280151247978,
+          "peak_vram_mb": 23.654296875,
+          "finish_reason": "length",
+          "committed": true,
+          "dropped_turns": 0,
+          "error_code": null,
+          "delta_events": 8,
+          "card_audit": [
+            {
+              "card_id": "fictional-ticket-l2",
+              "version": 1,
+              "reason": "scope"
+            },
+            {
+              "card_id": "fictional-ticket-iris",
+              "version": 2,
+              "reason": "injected"
+            }
+          ],
+          "after_request": {
+            "allocated_mib": 17.64892578125,
+            "reserved_mib": 30.0
+          }
+        },
+        {
+          "history": "long",
+          "committed_prior_turns": 14,
+          "setup_failures": [],
+          "input_tokens": 1905,
+          "output_tokens": 16,
+          "ttft_ms": 92.43049565702677,
+          "tokens_per_second": 210.60788486374003,
+          "latency_ms": 92.96970441937447,
+          "peak_vram_mb": 29.83203125,
+          "finish_reason": "length",
+          "committed": true,
+          "dropped_turns": 5,
+          "error_code": null,
+          "delta_events": 1,
+          "card_audit": [],
+          "after_request": {
+            "allocated_mib": 17.64892578125,
+            "reserved_mib": 54.0
+          }
+        }
+      ]
+    },
+    {
+      "activation": {
+        "model_id": "sft_final",
+        "load_ms": 377.4712271988392,
+        "warmup_ms": 10.383015498518944,
+        "resident_vram_mb": 17.64892578125
+      },
+      "after_switch": {
+        "allocated_mib": 17.64892578125,
+        "reserved_mib": 22.0
+      },
+      "cases": [
+        {
+          "history": "short",
+          "committed_prior_turns": 0,
+          "setup_failures": [],
+          "input_tokens": 163,
+          "output_tokens": 16,
+          "ttft_ms": 105.92310130596161,
+          "tokens_per_second": 155.31807285183683,
+          "latency_ms": 106.54573515057564,
+          "peak_vram_mb": 18.6923828125,
+          "finish_reason": "length",
+          "committed": true,
+          "dropped_turns": 0,
+          "error_code": null,
+          "delta_events": 1,
+          "card_audit": [],
+          "after_request": {
+            "allocated_mib": 17.64892578125,
+            "reserved_mib": 24.0
+          }
+        },
+        {
+          "history": "typical",
+          "committed_prior_turns": 2,
+          "setup_failures": [],
+          "input_tokens": 941,
+          "output_tokens": 16,
+          "ttft_ms": 98.59404619783163,
+          "tokens_per_second": 175.32362951495972,
+          "latency_ms": 99.16325844824314,
+          "peak_vram_mb": 23.654296875,
+          "finish_reason": "length",
+          "committed": true,
+          "dropped_turns": 0,
+          "error_code": null,
+          "delta_events": 1,
+          "card_audit": [
+            {
+              "card_id": "fictional-ticket-l2",
+              "version": 1,
+              "reason": "scope"
+            },
+            {
+              "card_id": "fictional-ticket-iris",
+              "version": 2,
+              "reason": "injected"
+            }
+          ],
+          "after_request": {
+            "allocated_mib": 17.64892578125,
+            "reserved_mib": 30.0
+          }
+        },
+        {
+          "history": "long",
+          "committed_prior_turns": 14,
+          "setup_failures": [],
+          "input_tokens": 1905,
+          "output_tokens": 16,
+          "ttft_ms": 93.32395903766155,
+          "tokens_per_second": 209.52049837086207,
+          "latency_ms": 93.8963033258915,
+          "peak_vram_mb": 29.83203125,
+          "finish_reason": "length",
+          "committed": true,
+          "dropped_turns": 5,
+          "error_code": null,
+          "delta_events": 1,
+          "card_audit": [],
+          "after_request": {
+            "allocated_mib": 17.64892578125,
+            "reserved_mib": 54.0
+          }
+        }
+      ]
+    },
+    {
+      "activation": {
+        "model_id": "base",
+        "load_ms": 351.05381812900305,
+        "warmup_ms": 8.77853948622942,
+        "resident_vram_mb": 17.63525390625
+      },
+      "after_switch": {
+        "allocated_mib": 17.63525390625,
+        "reserved_mib": 22.0
+      },
+      "cases": [
+        {
+          "history": "short",
+          "committed_prior_turns": 0,
+          "setup_failures": [],
+          "input_tokens": 163,
+          "output_tokens": 16,
+          "ttft_ms": 84.57829337567091,
+          "tokens_per_second": 195.7147528033219,
+          "latency_ms": 85.19507013261318,
+          "peak_vram_mb": 18.6787109375,
+          "finish_reason": "length",
+          "committed": true,
+          "dropped_turns": 0,
+          "error_code": null,
+          "delta_events": 1,
+          "card_audit": [],
+          "after_request": {
+            "allocated_mib": 17.63525390625,
+            "reserved_mib": 24.0
+          }
+        },
+        {
+          "history": "typical",
+          "committed_prior_turns": 2,
+          "setup_failures": [],
+          "input_tokens": 941,
+          "output_tokens": 16,
+          "ttft_ms": 74.0483095869422,
+          "tokens_per_second": 237.44519606357096,
+          "latency_ms": 74.51971154659986,
+          "peak_vram_mb": 23.640625,
+          "finish_reason": "length",
+          "committed": true,
+          "dropped_turns": 0,
+          "error_code": null,
+          "delta_events": 1,
+          "card_audit": [
+            {
+              "card_id": "fictional-ticket-l2",
+              "version": 1,
+              "reason": "scope"
+            },
+            {
+              "card_id": "fictional-ticket-iris",
+              "version": 2,
+              "reason": "injected"
+            }
+          ],
+          "after_request": {
+            "allocated_mib": 17.63525390625,
+            "reserved_mib": 30.0
+          }
+        },
+        {
+          "history": "long",
+          "committed_prior_turns": 14,
+          "setup_failures": [],
+          "input_tokens": 1905,
+          "output_tokens": 16,
+          "ttft_ms": 85.90791374444962,
+          "tokens_per_second": 229.671362029059,
+          "latency_ms": 86.41211502254009,
+          "peak_vram_mb": 29.818359375,
+          "finish_reason": "length",
+          "committed": true,
+          "dropped_turns": 5,
+          "error_code": null,
+          "delta_events": 1,
+          "card_audit": [],
+          "after_request": {
+            "allocated_mib": 17.63525390625,
+            "reserved_mib": 52.0
+          }
+        }
+      ]
+    }
+  ],
+  "after_runtime_unload": {
+    "allocated_mib": 16.25,
+    "reserved_mib": 20.0
+  },
+  "after_process_cublas_cleanup": {
+    "allocated_mib": 0.0,
+    "reserved_mib": 0.0
+  }
+}

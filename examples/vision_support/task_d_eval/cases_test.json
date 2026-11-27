@@ -1,0 +1,91 @@
+{
+  "schema": "lm_trainer.eval-cases.v1",
+  "fixture_only": true,
+  "split": "test",
+  "manifest": {
+    "schema": "lm_trainer.eval-manifest.v1",
+    "contract": "lm_trainer.eval.v1",
+    "split": "test",
+    "fixture_only": true,
+    "case_count": 2,
+    "purpose": "fictional vision-support evaluation only",
+    "cases": [
+      {
+        "case_id": "vision-test-001",
+        "split": "test",
+        "sha256": "dd1cd398284797b085680535baba9d8253969a861c201c15e7ff2e93945613ec"
+      },
+      {
+        "case_id": "vision-test-002",
+        "split": "test",
+        "sha256": "0bea29f43b9a144446987dd62f0bdf9c2cdfb654052665073ca8aa72fb6efb97"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "schema": "lm_trainer.eval.v1",
+      "case_id": "vision-test-001",
+      "target_person": "CS_AGENT",
+      "event_group": "demo:vision:trigger",
+      "split": "test",
+      "fixture_only": true,
+      "kind": "fixed_history",
+      "messages": [
+        {
+          "role": "user",
+          "content": "外触发模式下传送带提速后开始漏拍。"
+        },
+        {
+          "role": "assistant",
+          "content": "先确认一下触发计数和实际采集帧数是否一致。"
+        },
+        {
+          "role": "user",
+          "content": "触发计数1200，实际只有1168帧，曝光目前是5ms。"
+        }
+      ],
+      "rubric": [
+        "先区分采集链路与识别漏检",
+        "给出可执行的曝光/触发就绪检查步骤",
+        "不编造未给出的硬件型号参数"
+      ],
+      "reference_only": [
+        "先看触发计数与实际采集帧数差异（1200 vs 1168，少 32 帧），区分是相机没收到触发、触发被丢弃还是采集后漏存；再检查曝光 5ms 是否与当前节拍匹配、触发就绪（trigger ready）信号是否稳定，最后用固定样件验证。"
+      ],
+      "memory_condition": "M0"
+    },
+    {
+      "schema": "lm_trainer.eval.v1",
+      "case_id": "vision-test-002",
+      "target_person": "CS_AGENT",
+      "event_group": "demo:vision:exposure",
+      "split": "test",
+      "fixture_only": true,
+      "kind": "fixed_history",
+      "messages": [
+        {
+          "role": "user",
+          "content": "更换镜头后图像整体偏暗，曝光已经加到8ms还是偏暗。"
+        },
+        {
+          "role": "assistant",
+          "content": "确认一下光源和镜头光圈，另外光圈是手动还是自动？"
+        },
+        {
+          "role": "user",
+          "content": "光源是环形光，亮度调到80%了，镜头是手动光圈。"
+        }
+      ],
+      "rubric": [
+        "先区分光源/光圈/曝光三要素",
+        "给出按顺序的可执行排查步骤",
+        "不臆测未给出的相机型号"
+      ],
+      "reference_only": [
+        "手动光圈先确认实际光圈值是否被误调小；环形光 80% 需检查是否频闪、衰减或角度问题；曝光 8ms 在当前节拍下是否允许更长曝光；最后用灰度样件测均匀性与亮度。"
+      ],
+      "memory_condition": "M0"
+    }
+  ]
+}

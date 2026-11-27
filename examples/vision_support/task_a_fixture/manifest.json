@@ -1,0 +1,45 @@
+{
+  "schema": "lm_trainer.release.v1",
+  "release_id": "fictional_vision_support_v1",
+  "target_person": "CS_AGENT",
+  "parent_version": "fictional_vision_parent_v0",
+  "scope": "fixture",
+  "fixture_only": true,
+  "training_authorized": false,
+  "review_status": "approved",
+  "approval_ref": null,
+  "source_group_manifest": {
+    "path": "groups.jsonl",
+    "sha256": "38ebd6d0bcf1a2825f47b1817a4e991c70f035fedf91951661ee9a07474fb3b4"
+  },
+  "source_index": {
+    "path": "index.jsonl",
+    "sha256": "8c16ca9a0d75afd456228a92c620dca24c486fa47f20fbb2e405ff0621d46cbd"
+  },
+  "files": [
+    {
+      "path": "chat.jsonl",
+      "sha256": "056a8c59e181e61c13bf726bf84016c0cadb72bdf287c37585857578475f180d",
+      "source": "chat",
+      "kind": "cpt",
+      "split": "train",
+      "records": 2
+    },
+    {
+      "path": "notes.jsonl",
+      "sha256": "52b176fb2078311d4f631504bbadf2f132367f74f5cb4bf67e622f2ebaca3f1d",
+      "source": "notes",
+      "kind": "cpt",
+      "split": "train",
+      "records": 1
+    },
+    {
+      "path": "dyadic.jsonl",
+      "sha256": "a73f29431a6d784204dcd4e8a881f7fd540ac81d1b14a223dbf7c768294925e0",
+      "source": "dyadic",
+      "kind": "sft",
+      "split": "train",
+      "records": 1
+    }
+  ]
+}

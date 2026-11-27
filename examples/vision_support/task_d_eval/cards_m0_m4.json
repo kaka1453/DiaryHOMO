@@ -1,0 +1,175 @@
+{
+  "schema": "lm_trainer.eval-cards.v1",
+  "fixture_only": true,
+  "purpose": "Fictional machine-vision support context cards for the Task D M0–M4 experiment.",
+  "cards": [
+    {
+      "condition": "M1",
+      "card_id": "fictional-iris7-spec",
+      "namespace": "fixture-line-iris",
+      "kind": "device_spec",
+      "facts": [
+        "IRIS-7 exposure 8ms->5ms."
+      ],
+      "event_time": "2026-02-01T08:00:00+00:00",
+      "recorded_at": "2026-02-01T08:05:00+00:00",
+      "version": 3,
+      "status": "active",
+      "supersedes": 2,
+      "source_ref": "fixture:iris7-spec",
+      "uncertainty": "confirmed",
+      "permissions": {
+        "read": true,
+        "train": false
+      },
+      "scope": "role:CS_AGENT"
+    },
+    {
+      "condition": "M2",
+      "card_id": "fictional-unrelated-line",
+      "namespace": "fixture-line-iris",
+      "kind": "incident_fact",
+      "facts": [
+        "Unrelated line: conveyor 1.2 m/s; barcode focus 2026-01-20."
+      ],
+      "event_time": "2026-01-20T03:00:00+00:00",
+      "recorded_at": "2026-01-20T03:10:00+00:00",
+      "version": 1,
+      "status": "active",
+      "supersedes": null,
+      "source_ref": "fixture:unrelated-line",
+      "uncertainty": "synthetic",
+      "permissions": {
+        "read": true,
+        "train": false
+      },
+      "scope": "role:CS_AGENT"
+    },
+    {
+      "condition": "M3",
+      "card_id": "fictional-iris7-conflict",
+      "namespace": "fixture-line-iris",
+      "kind": "incident_fact",
+      "facts": [
+        "IRIS-7 exposure: 5 ms (2026-02-01)."
+      ],
+      "event_time": "2026-02-01T09:00:00+00:00",
+      "recorded_at": "2026-02-01T09:05:00+00:00",
+      "version": 1,
+      "status": "active",
+      "supersedes": null,
+      "source_ref": "fixture:iris7-conflict-a",
+      "uncertainty": "confirmed",
+      "permissions": {
+        "read": true,
+        "train": false
+      },
+      "scope": "role:CS_AGENT"
+    },
+    {
+      "condition": "M3",
+      "card_id": "fictional-iris7-conflict",
+      "namespace": "fixture-line-iris",
+      "kind": "incident_fact",
+      "facts": [
+        "IRIS-7 exposure: 8 ms (2026-02-03, unconfirmed)."
+      ],
+      "event_time": "2026-02-03T10:00:00+00:00",
+      "recorded_at": "2026-02-03T10:05:00+00:00",
+      "version": 2,
+      "status": "active",
+      "supersedes": 1,
+      "source_ref": "fixture:iris7-conflict-b",
+      "uncertainty": "unconfirmed",
+      "permissions": {
+        "read": true,
+        "train": false
+      },
+      "scope": "role:CS_AGENT"
+    },
+    {
+      "condition": "M4",
+      "card_id": "fictional-ambiguous-which-station",
+      "namespace": "fixture-line-iris",
+      "kind": "troubleshooting_note",
+      "facts": [
+        "Note: 'the usual station' exposure changed; station ID missing."
+      ],
+      "event_time": "2026-01-25T06:00:00+00:00",
+      "recorded_at": "2026-01-25T06:10:00+00:00",
+      "version": 1,
+      "status": "active",
+      "supersedes": null,
+      "source_ref": "fixture:ambiguous-station",
+      "uncertainty": "ambiguous",
+      "permissions": {
+        "read": true,
+        "train": false
+      },
+      "scope": "role:CS_AGENT"
+    },
+    {
+      "condition": "M4",
+      "card_id": "fictional-cross-namespace",
+      "namespace": "fixture-other-plant",
+      "kind": "incident_fact",
+      "facts": [
+        "Other-plant: line speed 1.8 m/s."
+      ],
+      "event_time": "2026-01-25T06:00:00+00:00",
+      "recorded_at": "2026-01-25T06:10:00+00:00",
+      "version": 1,
+      "status": "active",
+      "supersedes": null,
+      "source_ref": "fixture:other-plant",
+      "uncertainty": "synthetic",
+      "permissions": {
+        "read": true,
+        "train": false
+      },
+      "scope": "role:CS_AGENT"
+    },
+    {
+      "condition": "M4",
+      "card_id": "fictional-denied-read",
+      "namespace": "fixture-line-iris",
+      "kind": "incident_fact",
+      "facts": [
+        "Rejected card: read permission false."
+      ],
+      "event_time": "2026-01-25T06:00:00+00:00",
+      "recorded_at": "2026-01-25T06:10:00+00:00",
+      "version": 1,
+      "status": "active",
+      "supersedes": null,
+      "source_ref": "fixture:denied-read",
+      "uncertainty": "synthetic",
+      "permissions": {
+        "read": false,
+        "train": false
+      },
+      "scope": "role:CS_AGENT"
+    },
+    {
+      "condition": "M4",
+      "card_id": "fictional-iris7-spec",
+      "namespace": "fixture-line-iris",
+      "kind": "device_spec",
+      "facts": [
+        "IRIS-7: trigger counts accepted triggers."
+      ],
+      "event_time": "2026-01-20T08:00:00+00:00",
+      "recorded_at": "2026-01-20T08:05:00+00:00",
+      "version": 1,
+      "status": "superseded",
+      "supersedes": null,
+      "source_ref": "fixture:iris7-old",
+      "uncertainty": "confirmed",
+      "permissions": {
+        "read": true,
+        "train": false
+      },
+      "scope": "role:CS_AGENT"
+    }
+  ]
+}

@@ -1,207 +1,715 @@
 {
   "files": {
     "lm_trainer/LICENSE": {
-      "policy": "initial",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "947b92662ffa980a4833e08e2d89d941b776665b71ed403b7d34283206f5801a",
+        420
+      ],
       "target": [
         "947b92662ffa980a4833e08e2d89d941b776665b71ed403b7d34283206f5801a",
-        436
+        420
       ]
     },
     "lm_trainer/README.md": {
-      "policy": "initial",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "26b7e3eb90aba9b10c733d3932876c130eb9d96e0e9d3b84ee961373390f798b",
+        420
+      ],
       "target": [
-        "f3466687eb6b8fca1895631630b913ea87a4e991e6e84cb3bd7138a5c5eca63f",
+        "26b7e3eb90aba9b10c733d3932876c130eb9d96e0e9d3b84ee961373390f798b",
+        420
+      ]
+    },
+    "lm_trainer/TASK_A_CONTRACT.md": {
+      "policy": "copy",
+      "source": [
+        "68222124fc8ea441395c8b9462902e23665ae6b859d83b7eb6d4724c0ec1a1f9",
+        436
+      ],
+      "target": [
+        "68222124fc8ea441395c8b9462902e23665ae6b859d83b7eb6d4724c0ec1a1f9",
+        436
+      ]
+    },
+    "lm_trainer/TASK_B_CONTRACT.md": {
+      "policy": "copy",
+      "source": [
+        "fc04eaba000dcf27ba449e7b5df59a98c45c52ab4865216ac197532b912bb32d",
+        436
+      ],
+      "target": [
+        "fc04eaba000dcf27ba449e7b5df59a98c45c52ab4865216ac197532b912bb32d",
+        436
+      ]
+    },
+    "lm_trainer/TASK_C_CONTRACT.md": {
+      "policy": "copy",
+      "source": [
+        "caefce5e5a918a9c7014d760b8f3f6b3fc04f38b1251a87b55d28a8ba818442b",
+        436
+      ],
+      "target": [
+        "caefce5e5a918a9c7014d760b8f3f6b3fc04f38b1251a87b55d28a8ba818442b",
         436
       ]
     },
     "lm_trainer/THIRD_PARTY_LICENSE.txt": {
-      "policy": "initial",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "c58fae9a6375612b002745f0f0c88a09360307b208c60456581f6061994c921d",
+        420
+      ],
       "target": [
         "c58fae9a6375612b002745f0f0c88a09360307b208c60456581f6061994c921d",
-        436
+        420
       ]
     },
     "lm_trainer/__init__.py": {
-      "policy": "initial",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "2c34c57bda954570993314535acb4fcde245d0c679d1e331ec2c1c986a86a05c",
+        420
+      ],
       "target": [
         "2c34c57bda954570993314535acb4fcde245d0c679d1e331ec2c1c986a86a05c",
-        436
+        420
       ]
     },
     "lm_trainer/__main__.py": {
-      "policy": "adapted",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "7fdad78c1d2b7a09ee13f66782bcd7db2263d746e2dc66cd6da56334c0175159",
+        420
+      ],
       "target": [
-        "0d49e612d398b28e7de56b5406379847e8f40cdb1dee656b2f2da7f2670cd9d2",
+        "7fdad78c1d2b7a09ee13f66782bcd7db2263d746e2dc66cd6da56334c0175159",
+        420
+      ]
+    },
+    "lm_trainer/chat/__init__.py": {
+      "policy": "copy",
+      "source": [
+        "29f987b86974571f257fbc8d6865ede8df7c23d7122e22fc8e18db6ede4c3ddf",
+        436
+      ],
+      "target": [
+        "29f987b86974571f257fbc8d6865ede8df7c23d7122e22fc8e18db6ede4c3ddf",
+        436
+      ]
+    },
+    "lm_trainer/chat/__main__.py": {
+      "policy": "copy",
+      "source": [
+        "14d13a17b9413fe1af7eea085a150fba902a47b5f89491e9353eff98a20402b8",
+        436
+      ],
+      "target": [
+        "14d13a17b9413fe1af7eea085a150fba902a47b5f89491e9353eff98a20402b8",
+        436
+      ]
+    },
+    "lm_trainer/chat/backend.py": {
+      "policy": "copy",
+      "source": [
+        "99fae197d30003e726a43e93872dc93c2767d236b6ee029e7c0ee86e33966ea7",
+        436
+      ],
+      "target": [
+        "99fae197d30003e726a43e93872dc93c2767d236b6ee029e7c0ee86e33966ea7",
+        436
+      ]
+    },
+    "lm_trainer/chat/context.py": {
+      "policy": "copy",
+      "source": [
+        "ff13ba2dcd09e30744e0f3ba9185a3d2d0b369c061fc4720bba1427ce2d04db2",
+        436
+      ],
+      "target": [
+        "ff13ba2dcd09e30744e0f3ba9185a3d2d0b369c061fc4720bba1427ce2d04db2",
+        436
+      ]
+    },
+    "lm_trainer/chat/memory.py": {
+      "policy": "copy",
+      "source": [
+        "4c6d8d44674902a42d3127a701198b6117b99b7d233ee0d021e9d2e95e6f988a",
+        436
+      ],
+      "target": [
+        "4c6d8d44674902a42d3127a701198b6117b99b7d233ee0d021e9d2e95e6f988a",
+        436
+      ]
+    },
+    "lm_trainer/chat/registry.py": {
+      "policy": "copy",
+      "source": [
+        "6024333a742a3898600e3d903bf83e907240cce326ae259b8c12abd7bcefcb3d",
+        436
+      ],
+      "target": [
+        "6024333a742a3898600e3d903bf83e907240cce326ae259b8c12abd7bcefcb3d",
+        436
+      ]
+    },
+    "lm_trainer/chat/runtime.py": {
+      "policy": "copy",
+      "source": [
+        "241e27ebefae19a3baf7dcda0e46f1efb155a3186eb035d3a16c06024d3bd7d4",
+        436
+      ],
+      "target": [
+        "241e27ebefae19a3baf7dcda0e46f1efb155a3186eb035d3a16c06024d3bd7d4",
+        436
+      ]
+    },
+    "lm_trainer/chat/types.py": {
+      "policy": "copy",
+      "source": [
+        "1c52e6824bdbf41360d761be6c480104964bd59e012b35a9ab2100d0f7443fdc",
+        436
+      ],
+      "target": [
+        "1c52e6824bdbf41360d761be6c480104964bd59e012b35a9ab2100d0f7443fdc",
         436
       ]
     },
     "lm_trainer/config/__init__.py": {
-      "policy": "initial",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "3e14f4b9d65cccc805cce6f6662b06d506a9edae4a609f2a58f8c3203b8679d4",
+        420
+      ],
       "target": [
         "3e14f4b9d65cccc805cce6f6662b06d506a9edae4a609f2a58f8c3203b8679d4",
-        436
+        420
       ]
     },
     "lm_trainer/config/common.py": {
-      "policy": "initial",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "83551953559819d9b96c135f05a40e3558c15c693d5417605095d67b13f7085d",
+        420
+      ],
       "target": [
-        "9f29d841ae34959cbef2319eb0544ac87295b8b2fd155d90887b4bf75c902cae",
+        "83551953559819d9b96c135f05a40e3558c15c693d5417605095d67b13f7085d",
+        420
+      ]
+    },
+    "lm_trainer/config/stages.py": {
+      "policy": "copy",
+      "source": [
+        "8831ef22ecbd89ab2d5c9319f6fe8cc5fad0f216855b59c3993bc820bc47eaf6",
+        436
+      ],
+      "target": [
+        "8831ef22ecbd89ab2d5c9319f6fe8cc5fad0f216855b59c3993bc820bc47eaf6",
         436
       ]
     },
     "lm_trainer/config/train_config.py": {
-      "policy": "adapted",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "25a3473e5372213a0a314f37764761ad731fe45459001842eb342e8904216e73",
+        420
+      ],
       "target": [
-        "d83ed7dc46887ddb61e02e4a6dd2eb700963a8ffc6d20e65717dbca4e00808f7",
+        "25a3473e5372213a0a314f37764761ad731fe45459001842eb342e8904216e73",
+        420
+      ]
+    },
+    "lm_trainer/eval/__init__.py": {
+      "policy": "copy",
+      "source": [
+        "20bff8f7c170639ca6f32af1c441c90085acada60e5760992adc165b3b49a648",
+        436
+      ],
+      "target": [
+        "20bff8f7c170639ca6f32af1c441c90085acada60e5760992adc165b3b49a648",
+        436
+      ]
+    },
+    "lm_trainer/eval/__main__.py": {
+      "policy": "copy",
+      "source": [
+        "e3ccb5d18cf0592e8e60554f68e6322b59191c97e3e6c428bbf2c53f8f2e96fc",
+        436
+      ],
+      "target": [
+        "e3ccb5d18cf0592e8e60554f68e6322b59191c97e3e6c428bbf2c53f8f2e96fc",
+        436
+      ]
+    },
+    "lm_trainer/eval/blind.py": {
+      "policy": "copy",
+      "source": [
+        "ab63b768540d8b10771689e2962af23cf70a53152b76abe4072fb8cdae9a7ce2",
+        436
+      ],
+      "target": [
+        "ab63b768540d8b10771689e2962af23cf70a53152b76abe4072fb8cdae9a7ce2",
+        436
+      ]
+    },
+    "lm_trainer/eval/cards.py": {
+      "policy": "copy",
+      "source": [
+        "1713c4297d29ce7da01c2d0eb98fad7fd6d15a5179db2a5d85e48c0ae41579ec",
+        436
+      ],
+      "target": [
+        "1713c4297d29ce7da01c2d0eb98fad7fd6d15a5179db2a5d85e48c0ae41579ec",
+        436
+      ]
+    },
+    "lm_trainer/eval/provider.py": {
+      "policy": "copy",
+      "source": [
+        "807e46b1b36ce1f99319678f7053a4d20f799ccace75940465720f09476c3c00",
+        436
+      ],
+      "target": [
+        "807e46b1b36ce1f99319678f7053a4d20f799ccace75940465720f09476c3c00",
+        436
+      ]
+    },
+    "lm_trainer/eval/report.py": {
+      "policy": "copy",
+      "source": [
+        "3444aaad0333a8c1cf29b8dd0b7c5896ad6a3c2d3ce2728d1e92fc8e53c11c5f",
+        436
+      ],
+      "target": [
+        "3444aaad0333a8c1cf29b8dd0b7c5896ad6a3c2d3ce2728d1e92fc8e53c11c5f",
+        436
+      ]
+    },
+    "lm_trainer/eval/runner.py": {
+      "policy": "copy",
+      "source": [
+        "66561e5a20874b7558212c752796fd3f8457e92aab325fc42f4685c8a2ef743a",
+        436
+      ],
+      "target": [
+        "66561e5a20874b7558212c752796fd3f8457e92aab325fc42f4685c8a2ef743a",
+        436
+      ]
+    },
+    "lm_trainer/eval/schema.py": {
+      "policy": "copy",
+      "source": [
+        "54b2fe5d9d283e0febbd556a2ef0807e03d8bd06e3a5240ae669564b4c0f6559",
+        436
+      ],
+      "target": [
+        "54b2fe5d9d283e0febbd556a2ef0807e03d8bd06e3a5240ae669564b4c0f6559",
         436
       ]
     },
     "lm_trainer/generation.py": {
-      "policy": "initial",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "ee560a774e5044078662e114719c69e523c3b9d894b8d76d4f95f8aa9dba41e2",
+        420
+      ],
       "target": [
         "ee560a774e5044078662e114719c69e523c3b9d894b8d76d4f95f8aa9dba41e2",
-        436
+        420
       ]
     },
     "lm_trainer/model/__init__.py": {
-      "policy": "initial",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "22ce74ea7a4a43be8afe75e32d9a16b029f9b839474681a6964009f9acdb18cd",
+        420
+      ],
       "target": [
         "22ce74ea7a4a43be8afe75e32d9a16b029f9b839474681a6964009f9acdb18cd",
-        436
+        420
       ]
     },
     "lm_trainer/model/loader.py": {
-      "policy": "initial",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "24ae81d757dbb6c6fbdc9790defbfda15bfb7b035e6a54cb0f9abbc4b6211e85",
+        420
+      ],
       "target": [
-        "a18a542d2411602e99efe5adbf2c977f2eb9cc6935b2dbea7ee39df5eaaac69d",
-        436
+        "24ae81d757dbb6c6fbdc9790defbfda15bfb7b035e6a54cb0f9abbc4b6211e85",
+        420
       ]
     },
     "lm_trainer/model/quantization.py": {
-      "policy": "adapted",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "e17596402c21375130417bb87c89c69f22b3df179c4756d7daa082bbfafa1732",
+        420
+      ],
       "target": [
         "e17596402c21375130417bb87c89c69f22b3df179c4756d7daa082bbfafa1732",
-        436
+        420
       ]
     },
     "lm_trainer/requirements.txt": {
-      "policy": "initial",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "37b7b647efc8bdfbdff86dffdecb852e376954a49c246de929fe368d5abc37e6",
+        420
+      ],
       "target": [
         "37b7b647efc8bdfbdff86dffdecb852e376954a49c246de929fe368d5abc37e6",
+        420
+      ]
+    },
+    "lm_trainer/template_policy.py": {
+      "policy": "copy",
+      "source": [
+        "9abeb3ba1a42f97bf5de29fc4239875c75df2a47c671e94b65956c7d1b51135d",
+        436
+      ],
+      "target": [
+        "9abeb3ba1a42f97bf5de29fc4239875c75df2a47c671e94b65956c7d1b51135d",
         436
       ]
     },
     "lm_trainer/tests/test_contract.py": {
-      "policy": "initial",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "cd19d9530b719dc3df3badc25e0963185c062d0ca7d94de27ea01f8da9cf5e11",
+        420
+      ],
       "target": [
         "cd19d9530b719dc3df3badc25e0963185c062d0ca7d94de27ea01f8da9cf5e11",
-        436
+        420
       ]
     },
     "lm_trainer/tests/test_hf.py": {
-      "policy": "initial",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "fdfa47c069eb682e3cf813cfcb972c4c6caf5449ae0345021a005bd19c5d7f0b",
+        420
+      ],
       "target": [
         "fdfa47c069eb682e3cf813cfcb972c4c6caf5449ae0345021a005bd19c5d7f0b",
+        420
+      ]
+    },
+    "lm_trainer/tests/test_task_a.py": {
+      "policy": "copy",
+      "source": [
+        "fc73c785640ee4091dd679f6096b3747b61a3d711d3c0ccc6ab71b622852b2a3",
+        436
+      ],
+      "target": [
+        "fc73c785640ee4091dd679f6096b3747b61a3d711d3c0ccc6ab71b622852b2a3",
+        436
+      ]
+    },
+    "lm_trainer/tests/test_task_b.py": {
+      "policy": "copy",
+      "source": [
+        "030920e29dcf791685b6bbc47a8cb99ed17c92b1df31c86efe108ae7c1351ea0",
+        436
+      ],
+      "target": [
+        "030920e29dcf791685b6bbc47a8cb99ed17c92b1df31c86efe108ae7c1351ea0",
+        436
+      ]
+    },
+    "lm_trainer/tests/test_task_c.py": {
+      "policy": "copy",
+      "source": [
+        "a8557769f80e8e6598c1dee8ac925aedb5d13fb934239f65b783a85f874124a1",
+        436
+      ],
+      "target": [
+        "a8557769f80e8e6598c1dee8ac925aedb5d13fb934239f65b783a85f874124a1",
+        436
+      ]
+    },
+    "lm_trainer/tests/test_task_d.py": {
+      "policy": "copy",
+      "source": [
+        "529f952d7242de3bbe6551f6e8b0c3129ad1288a4ae3a6029512bc27ce0c7e68",
+        436
+      ],
+      "target": [
+        "529f952d7242de3bbe6551f6e8b0c3129ad1288a4ae3a6029512bc27ce0c7e68",
+        436
+      ]
+    },
+    "lm_trainer/tests/test_task_d_ui.py": {
+      "policy": "copy",
+      "source": [
+        "34a99fb8a35b001f73c08b59b309d96b9b1e8303642f04ada352c4b183044e8b",
+        436
+      ],
+      "target": [
+        "34a99fb8a35b001f73c08b59b309d96b9b1e8303642f04ada352c4b183044e8b",
         436
       ]
     },
     "lm_trainer/train/__init__.py": {
-      "policy": "initial",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "9ce48d6e7b706512ca2ac0bfd6913e6a7ae8cb37d3cacc14ca512922af470bf3",
+        420
+      ],
       "target": [
         "9ce48d6e7b706512ca2ac0bfd6913e6a7ae8cb37d3cacc14ca512922af470bf3",
+        420
+      ]
+    },
+    "lm_trainer/train/artifacts.py": {
+      "policy": "copy",
+      "source": [
+        "fc366dac391ac8f243630e909f4ae5cf92c45ecf8343a398053107f63651aeba",
+        436
+      ],
+      "target": [
+        "fc366dac391ac8f243630e909f4ae5cf92c45ecf8343a398053107f63651aeba",
         436
       ]
     },
     "lm_trainer/train/bootstrap.py": {
-      "policy": "adapted",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "4bf8191910ef9f635f436345f7d735d16c7ee6f112d4a7fb93337103f40762d4",
+        420
+      ],
       "target": [
         "4bf8191910ef9f635f436345f7d735d16c7ee6f112d4a7fb93337103f40762d4",
+        420
+      ]
+    },
+    "lm_trainer/train/checkpoints.py": {
+      "policy": "copy",
+      "source": [
+        "28b12285b921ebdb9f14dc5abc007398da22476a94aee4f04459efa33db3364e",
+        436
+      ],
+      "target": [
+        "28b12285b921ebdb9f14dc5abc007398da22476a94aee4f04459efa33db3364e",
         436
       ]
     },
     "lm_trainer/train/data.py": {
-      "policy": "initial",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "68083bbcae885eb53f7908371dbb50f5fc765540d175b50a0eb6aa11bffd5a56",
+        420
+      ],
       "target": [
-        "df928516d77bb013f4709fc93b2bd5e776dd41a270fc5d72b61f22faefdbdcd5",
+        "68083bbcae885eb53f7908371dbb50f5fc765540d175b50a0eb6aa11bffd5a56",
+        420
+      ]
+    },
+    "lm_trainer/train/dev.py": {
+      "policy": "copy",
+      "source": [
+        "f12cad5a6912271e86b9df56412e4e9d678a03e73d0a8ca9cb406acd753a5119",
+        436
+      ],
+      "target": [
+        "f12cad5a6912271e86b9df56412e4e9d678a03e73d0a8ca9cb406acd753a5119",
+        436
+      ]
+    },
+    "lm_trainer/train/encoding.py": {
+      "policy": "copy",
+      "source": [
+        "317863b406fd0605d1aa7de276d77e177ba0a7e07287ee182d662ff43316eb9c",
+        436
+      ],
+      "target": [
+        "317863b406fd0605d1aa7de276d77e177ba0a7e07287ee182d662ff43316eb9c",
         436
       ]
     },
     "lm_trainer/train/engine.py": {
-      "policy": "adapted",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "5a0bf560deb380792c58f5c3ba13542e5777f9f7c57cbe452c2913793de245a7",
+        420
+      ],
       "target": [
-        "26ca7bcf101682845e1ce75a8beacabe803afbb247f2ccb9898088d1765fe35f",
-        436
+        "5a0bf560deb380792c58f5c3ba13542e5777f9f7c57cbe452c2913793de245a7",
+        420
       ]
     },
     "lm_trainer/train/io.py": {
-      "policy": "initial",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "cbb0327f32c64eb61c09bfe639554c13977b51b45e8e21f6b8103fe7840386c1",
+        420
+      ],
       "target": [
-        "644273e06781479a6af48af3f7ea650fab8200208d09d629e45151f91f922397",
-        436
+        "cbb0327f32c64eb61c09bfe639554c13977b51b45e8e21f6b8103fe7840386c1",
+        420
       ]
     },
     "lm_trainer/train/metrics.py": {
-      "policy": "initial",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "933032a6d8d475addee37eeb1c5d5f52b91d1661d2195b4a5e9dd68f9ef4c565",
+        420
+      ],
       "target": [
         "933032a6d8d475addee37eeb1c5d5f52b91d1661d2195b4a5e9dd68f9ef4c565",
-        436
+        420
       ]
     },
     "lm_trainer/train/modeling.py": {
-      "policy": "adapted",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "1830cd561d3fc5adf0f9200b58b8d6168d329dba5d8ef3bcaf4ebfe595e39a27",
+        420
+      ],
       "target": [
-        "3dafb570a251be9a6021c4a85deea2d9ba69c28b614b7b6e68970c7dcc2adab3",
-        436
+        "1830cd561d3fc5adf0f9200b58b8d6168d329dba5d8ef3bcaf4ebfe595e39a27",
+        420
       ]
     },
     "lm_trainer/train/performance.py": {
-      "policy": "adapted",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "b86c46decf124334d80ee0f6022b9cb65a3d6d5c4c3ae39e86745469fc255d3f",
+        420
+      ],
       "target": [
-        "73dbec910f5dcdd9e947dc8d5794dd4bbb199197f27f4b5d23342aec576b6736",
-        436
+        "b86c46decf124334d80ee0f6022b9cb65a3d6d5c4c3ae39e86745469fc255d3f",
+        420
       ]
     },
     "lm_trainer/train/reproducibility.py": {
-      "policy": "initial",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "75677854086bbc65869462860463468cfe5f4168a9cb4156052cdc8434c70dd7",
+        420
+      ],
       "target": [
-        "9fa73f3ec5bc0a39e66f04d0231bd6e468679721108f0cbd515498a0177fa0d8",
+        "75677854086bbc65869462860463468cfe5f4168a9cb4156052cdc8434c70dd7",
+        420
+      ]
+    },
+    "lm_trainer/train/sampling.py": {
+      "policy": "copy",
+      "source": [
+        "f9ee93b65b1577a82462980bd413947e66b105cffa6e05a8b5e0853c35995e2f",
+        436
+      ],
+      "target": [
+        "f9ee93b65b1577a82462980bd413947e66b105cffa6e05a8b5e0853c35995e2f",
         436
       ]
     },
     "lm_trainer/train/schedule.py": {
-      "policy": "initial",
-      "source": null,
+      "policy": "copy",
+      "source": [
+        "0770d3c72de3a760f1605cf2bbe8a827167b9be22b5129ddd32657b768cfc2c4",
+        420
+      ],
       "target": [
-        "66a6d0f265c1d09bee6b6c59f19cc9d7e9554352f16d43f2e55665b7b246e5a9",
+        "0770d3c72de3a760f1605cf2bbe8a827167b9be22b5129ddd32657b768cfc2c4",
+        420
+      ]
+    },
+    "lm_trainer/train/schema.py": {
+      "policy": "copy",
+      "source": [
+        "8e90f08e416c5287f60be08d2964ebe208ccedcf4af38b4d3456b32b0c06afd4",
+        436
+      ],
+      "target": [
+        "8e90f08e416c5287f60be08d2964ebe208ccedcf4af38b4d3456b32b0c06afd4",
+        436
+      ]
+    },
+    "lm_trainer/train/stages.py": {
+      "policy": "copy",
+      "source": [
+        "cff5126317ba5ed7f965ad54b6e673e9e93bd9b3e7c06ea4ed20c16383e9f4c6",
+        436
+      ],
+      "target": [
+        "cff5126317ba5ed7f965ad54b6e673e9e93bd9b3e7c06ea4ed20c16383e9f4c6",
+        436
+      ]
+    },
+    "lm_trainer/webui/__init__.py": {
+      "policy": "copy",
+      "source": [
+        "c12414dd8e6b41cf327f888806ba7ec197bb51d8c5685d7e9efd8e8f17d24245",
+        436
+      ],
+      "target": [
+        "c12414dd8e6b41cf327f888806ba7ec197bb51d8c5685d7e9efd8e8f17d24245",
+        436
+      ]
+    },
+    "lm_trainer/webui/__main__.py": {
+      "policy": "copy",
+      "source": [
+        "c58bee448f76f8ea45a292cec6324fd0e1e78f02eaa2c69288ddfe4d06b61f46",
+        436
+      ],
+      "target": [
+        "c58bee448f76f8ea45a292cec6324fd0e1e78f02eaa2c69288ddfe4d06b61f46",
+        436
+      ]
+    },
+    "lm_trainer/webui/app.py": {
+      "policy": "copy",
+      "source": [
+        "13bd509810f8a36fa8169a467528a294b5e78bac25080a0554f24d9c27331858",
+        436
+      ],
+      "target": [
+        "13bd509810f8a36fa8169a467528a294b5e78bac25080a0554f24d9c27331858",
+        436
+      ]
+    },
+    "lm_trainer/webui/markdown_safe.py": {
+      "policy": "copy",
+      "source": [
+        "e4037beab50e6119b51ed6dd28ce853cd764512eeed7f4a9b18d802adb7bed8d",
+        436
+      ],
+      "target": [
+        "e4037beab50e6119b51ed6dd28ce853cd764512eeed7f4a9b18d802adb7bed8d",
+        436
+      ]
+    },
+    "lm_trainer/webui/state.py": {
+      "policy": "copy",
+      "source": [
+        "3bb31a048e0d38a613b7b403061c8e4ec1c78283c63bc719f0691b9f85a63d93",
+        436
+      ],
+      "target": [
+        "3bb31a048e0d38a613b7b403061c8e4ec1c78283c63bc719f0691b9f85a63d93",
         436
       ]
     }
   },
   "initial_validation": "Receiver baseline: legacy CPU tests, independent source CPU smoke and synthetic product regression. Matching source bytes require explicit review before enrollment.",
+  "last_sync": {
+    "added": 38,
+    "file_count": 63,
+    "mode": "allowlisted_copy",
+    "source_branch": "main",
+    "source_commit": "f83fbacf60c2710b7829c664b6fa0933b97a0cad",
+    "test_fixtures": "examples/vision_support",
+    "unchanged": 14,
+    "updated": 11,
+    "verification": {
+      "boa_core_boundary_trainer_tests": "29 passed, 0 failed",
+      "lm_trainer_cpu_tests": "131 passed, 6 skipped, 0 failed",
+      "pre_existing_develop_issue": "tests/test_unsloth_integration.py (12 failed on base develop 94fedc8 due to required --asset-root)"
+    }
+  },
   "schema": 1,
   "upstream_observation": {
     "branch": "main",

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 import torch
 from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -8,9 +7,15 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from lm_trainer.model.quantization import build_quantization_config
 
 
-def load_tokenizer(model_name_or_path: str, use_fast: bool | None = None):
+def load_tokenizer(
+    model_name_or_path: str,
+    use_fast: bool | None = None,
+    *,
+    local_files_only: bool = False,
+):
     load_kwargs = {
-        "trust_remote_code": True,
+        "trust_remote_code": not local_files_only,
+        "local_files_only": local_files_only,
     }
     if use_fast is not None:
         load_kwargs["use_fast"] = use_fast

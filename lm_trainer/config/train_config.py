@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +13,16 @@ from lm_trainer.config.common import (
     require_keys,
     str2bool,
 )
+from lm_trainer.config.stages import (
+    BOUNDED_DEFAULTS,
+    STAGE_DEFAULTS,
+    STAGE_LOCAL,
+    check_stage_paths,
+    configure_stage,
+    reject_placeholders,
+)
 from lm_trainer.model.quantization import normalize_quantization_mode
+from lm_trainer.train.schema import DATA_DEFAULTS, configure_data
 
 TRAIN_CONFIG_FIELDS = [
     "model_name_or_path",
@@ -43,6 +53,7 @@ MODEL_CONFIG_FIELDS = [
 ]
 
 OPTIONAL_DEFAULTS = {
+    **DATA_DEFAULTS,
     "backend": "hf",
     "compute_dtype": "fp16",
     "gradient_checkpointing": "auto",
@@ -50,9 +61,17 @@ OPTIONAL_DEFAULTS = {
 }
 
 RUNTIME_FIELDS = set(
-    TRAIN_CONFIG_FIELDS + MODEL_CONFIG_FIELDS + list(OPTIONAL_DEFAULTS)
+    TRAIN_CONFIG_FIELDS
+    + MODEL_CONFIG_FIELDS
+    + list(OPTIONAL_DEFAULTS)
+    + list(STAGE_DEFAULTS)
 )
-PATH_FIELDS = {"model_name_or_path", "checkpoint_dir", "data_file_path"}
+PATH_FIELDS = {
+    "model_name_or_path",
+    "checkpoint_dir",
+    "data_file_path",
+    "manifest_path",
+}
 INT_FIELDS = {
     "benchmark_warmup_steps",
     "max_length",
@@ -84,13 +103,27 @@ ALLOWED_QUANTIZATION_MODES = {"4bit", "8bit", "none"}
 
 
 CLI_OVERRIDE_SPECS = [
+    ("--stage-name", "name", str, "Name of an explicit single stage."),
+    ("--init-adapter", "init_adapter", str, "new, continue_stage or resume."),
+    ("--parent", "parent", str, "Explicit inference_adapter to inherit."),
+    ("--resume-from", "resume_from", str, "Explicit training_checkpoint to resume."),
+    (
+        "--stop-after-updates",
+        "stop_after_updates",
+        int,
+        "HF only: checkpoint and pause at an update boundary.",
+    ),
+    ("--output-dir", "output_dir", str, "Alias for the single-stage checkpoint_dir."),
+    ("--data-mode", "data_mode", str, "Data entrance: legacy, fixture, or release."),
+    ("--objective", "objective", str, "Explicit fixture/release training objective."),
+    ("--manifest-path", "manifest_path", str, "Path to a fixture or release manifest."),
     (
         "--backend",
         "backend",
         str,
         "Training backend: hf or unsloth (separate processes).",
     ),
-    ("--compute-dtype", "compute_dtype", str, "Compute precision: fp16 or bf16."),
+    ("--compute-dtype", "compute_dtype", str, "Compute precision: fp16, bf16 or fp32."),
     (
         "--gradient-checkpointing",
         "gradient_checkpointing",
@@ -246,13 +279,19 @@ def build_train_parser(
         parser.add_argument(
             flag, dest=dest, type=value_type, default=None, help=help_text
         )
-    parser.add_argument(
+    checks = parser.add_mutually_exclusive_group()
+    checks.add_argument(
+        "--validate-release",
+        action="store_true",
+        help="Check data permissions and integrity and print a stage plan without loading a model.",
+    )
+    checks.add_argument(
         "--dry-run",
         dest="dry_run",
         action="store_true",
         help="Only validate config and print resolved values.",
     )
-    parser.add_argument(
+    checks.add_argument(
         "--simulate-only",
         dest="simulate_only",
         action="store_true",
@@ -269,7 +308,11 @@ def collect_config_values(
 
 def apply_runtime_casts(runtime: dict[str, Any], path_root: Path) -> None:
     for field in PATH_FIELDS:
-        runtime[field] = str((path_root / Path(runtime[field]).expanduser()).resolve())
+        if runtime[field] is not None:
+            path = path_root / Path(runtime[field]).expanduser()
+            runtime[field] = str(
+                path.absolute() if field == "manifest_path" else path.resolve()
+            )
     cast_runtime_values(runtime)
 
 
@@ -296,8 +339,16 @@ def validate_runtime_values(runtime: dict[str, Any]) -> None:
         runtime.setdefault(key, default)
     if runtime["backend"] not in {"hf", "unsloth"}:
         raise ValueError("backend 必须是 hf 或 unsloth。")
-    if runtime["compute_dtype"] not in {"fp16", "bf16"}:
-        raise ValueError("compute_dtype 必须是 fp16 或 bf16。")
+    if runtime["compute_dtype"] not in {"fp16", "bf16", "fp32"}:
+        raise ValueError("compute_dtype 必须是 fp16、bf16 或 fp32。")
+    if runtime["compute_dtype"] == "fp32" and (
+        runtime["backend"] != "hf" or runtime["quantization_mode"] != "none"
+    ):
+        raise ValueError("fp32 requires an unquantized HF model.")
+    if runtime["lora_bias"] not in {"none", "all", "lora_only"}:
+        raise ValueError("Unsupported lora_bias.")
+    if not math.isfinite(runtime["lr"]) or runtime["lr"] <= 0:
+        raise ValueError("lr must be finite and positive.")
     if runtime["gradient_checkpointing"] == "auto":
         runtime["gradient_checkpointing"] = (
             "unsloth" if runtime["backend"] == "unsloth" else "standard"
@@ -339,13 +390,10 @@ def resolve_asset_runtime_paths(
     external_model: str | None,
     dry_run: bool,
 ) -> None:
-    data = asset_path(root, runtime["data_file_path"], "data_file_path", "data/train")
-    # The dataset loader interprets these characters as glob patterns.
-    if any(pattern in str(data) for pattern in ("*", "?", "[", "::")):
-        raise ValueError(
-            f"data_file_path: {runtime['data_file_path']!r} must be a literal dataset path"
-        )
-    runtime["data_file_path"] = str(data)
+    field = "data_file_path" if runtime["data_mode"] == "legacy" else "manifest_path"
+    if any(pattern in runtime[field] for pattern in ("*", "?", "[", "::")):
+        raise ValueError(f"{field} must be a literal path")
+    runtime[field] = str(asset_path(root, runtime[field], field, "data/train"))
     if eval_file is not None:
         runtime["eval_file_path"] = str(
             asset_path(root, eval_file, "eval_file_path", "data/eval")
@@ -407,8 +455,64 @@ def build_train_runtime_config(
     train_cfg = load_yaml_config(train_config_path, train_label)
     model_cfg = load_yaml_config(model_config_path, model_label)
 
+    options = (
+        args,
+        root,
+        path_root or train_config_path.parent,
+        train_label,
+        model_label,
+    )
+    stages = train_cfg.get("stages")
+    if "stages" in train_cfg:
+        if not isinstance(stages, list) or not stages:
+            raise ValueError("stages must be a nonempty list of stage mappings.")
+        if any(getattr(args, k, None) is not None for k in STAGE_LOCAL):
+            raise ValueError("Stage-local CLI overrides require a single-stage config.")
+        shared = {
+            k: v for k, v in train_cfg.items() if k not in STAGE_LOCAL | {"stages"}
+        }
+        if set(shared) - RUNTIME_FIELDS:
+            raise ValueError("Unknown shared stage configuration field.")
+        runtimes = []
+        for item in stages:
+            if not isinstance(item, dict) or set(item) - RUNTIME_FIELDS:
+                raise ValueError("Unknown field or invalid stage mapping.")
+            runtimes.append(
+                _build_runtime({**shared, **item}, model_cfg, *options, staged=True)
+            )
+        check_stage_paths(runtimes)
+        if len({(r["backend"], r["compute_dtype"]) for r in runtimes}) != 1:
+            raise ValueError(
+                "One stages plan requires a single backend and compute dtype."
+            )
+        if any(r["stop_after_updates"] is not None for r in runtimes):
+            raise ValueError("Use stop_after_updates with a single-stage config.")
+        return {"stages": runtimes, "backend": runtimes[0]["backend"]}
+
+    staged = any(
+        k in train_cfg or getattr(args, k, None) is not None for k in STAGE_DEFAULTS
+    )
+    if staged and set(train_cfg) - RUNTIME_FIELDS - {"load_in_8bit", "eval_file_path"}:
+        raise ValueError("Unknown stage configuration field.")
+    runtime = _build_runtime(train_cfg, model_cfg, *options, staged=staged)
+    if staged:
+        check_stage_paths([runtime])
+    runtime["train_config_path"] = train_config_path
+    runtime["model_config_path"] = model_config_path
+    return runtime
+
+
+def _build_runtime(
+    train_cfg, model_cfg, args, root, path_root, train_label, model_label, *, staged
+):
+    if staged:
+        reject_placeholders(dict(model_cfg) | dict(train_cfg))
+        train_cfg = {**BOUNDED_DEFAULTS, **train_cfg}
     runtime = collect_config_values(train_cfg, TRAIN_CONFIG_FIELDS)
     runtime.update(collect_config_values(model_cfg, MODEL_CONFIG_FIELDS))
+    if staged:
+        runtime.update({k: train_cfg[k] for k in MODEL_CONFIG_FIELDS if k in train_cfg})
+        runtime.update({k: train_cfg.get(k, v) for k, v in STAGE_DEFAULTS.items()})
     runtime.update(
         {key: train_cfg.get(key, default) for key, default in OPTIONAL_DEFAULTS.items()}
     )
@@ -416,13 +520,26 @@ def build_train_runtime_config(
         runtime["quantization_mode"] = (
             "8bit" if str2bool(train_cfg["load_in_8bit"]) else "none"
         )
-
     apply_cli_overrides(runtime, args)
+    if staged:
+        reject_placeholders(runtime)
+        if runtime["output_dir"] is not None:
+            if runtime["checkpoint_dir"] is not None:
+                raise ValueError("Choose output_dir or checkpoint_dir, not both.")
+            runtime["checkpoint_dir"] = runtime["output_dir"]
+        if any(
+            type(runtime[k]) is not int for k in INT_FIELDS if runtime[k] is not None
+        ):
+            raise ValueError("Stage integer fields require literal integers.")
+    runtime.update(configure_data(runtime))
+    required_train = [
+        key
+        for key in TRAIN_CONFIG_FIELDS
+        if key != "data_file_path" or runtime["data_mode"] == "legacy"
+    ]
     if root is None:
-        require_keys(runtime, TRAIN_CONFIG_FIELDS + MODEL_CONFIG_FIELDS, "train/model")
-        apply_runtime_casts(
-            runtime, path_root if path_root is not None else train_config_path.parent
-        )
+        require_keys(runtime, required_train + MODEL_CONFIG_FIELDS, "train/model")
+        apply_runtime_casts(runtime, path_root)
     else:
         external_model = getattr(args, "external_base_model", None)
         if external_model is not None:
@@ -431,19 +548,20 @@ def build_train_runtime_config(
                     "Choose either --model-name-or-path or --external-base-model"
                 )
             runtime["model_name_or_path"] = external_model
-        require_keys(runtime, TRAIN_CONFIG_FIELDS, train_label)
+        require_keys(runtime, required_train, train_label)
         require_keys(runtime, MODEL_CONFIG_FIELDS, model_label)
         resolve_asset_runtime_paths(
             runtime,
             root,
             eval_file=train_cfg.get("eval_file_path"),
             external_model=external_model,
-            dry_run=getattr(args, "dry_run", False),
+            dry_run=getattr(args, "dry_run", False)
+            or getattr(args, "validate_release", False),
         )
         cast_runtime_values(runtime)
     validate_runtime_values(runtime)
-    runtime["train_config_path"] = train_config_path
-    runtime["model_config_path"] = model_config_path
+    if staged:
+        configure_stage(runtime, root, path_root)
     return runtime
 
 

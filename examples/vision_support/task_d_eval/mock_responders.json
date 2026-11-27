@@ -1,0 +1,8 @@
+{
+  "fixture_only": true,
+  "note": "Fictional canned replies used only to exercise the offline evaluation pipeline. These are NOT model outputs.",
+  "base": "请先确认触发计数与实际存图数量是否一致，并检查曝光时间是否与当前节拍匹配。",
+  "cpt_stage1": "虚构回复：先看采集链路，再核对触发就绪信号与曝光 5ms 是否匹配当前节拍。",
+  "sft_final": "虚构回复：触发计数 1200 与存图 1168 相差 32 帧，先确认触发是否被丢弃；曝光 5ms 需结合节拍确认，再检查触发就绪窗口。",
+  "*": "请先确认触发计数与存图数量是否一致，并检查曝光时间是否与当前节拍匹配。"
+}

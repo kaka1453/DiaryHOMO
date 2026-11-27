@@ -1,0 +1,28 @@
+# All relative paths resolve from this YAML when not using --asset-root.
+model_name_or_path: base
+checkpoint_dir: runs/fixture-cpt
+quantization_mode: none
+max_length: 300
+batch_size: 2
+shuffle: true
+auto_pad_batch: true
+epochs: 1
+gradient_accumulation_steps: 2
+lr: 0.0001
+warmup_steps: 0
+max_steps: 4
+save_steps: 20
+seed: 7
+num_workers: 0
+pin_memory: false
+
+data_mode: fixture
+objective: causal_text
+manifest_path: task_a_fixture/manifest.json
+sources: [chat, notes]
+target_loss_token_share: {chat: 0.6, notes: 0.4}
+token_budget: 160
+max_sample_repeats: 2
+max_effective_epochs: 2
+add_bos: false
+add_eos: true

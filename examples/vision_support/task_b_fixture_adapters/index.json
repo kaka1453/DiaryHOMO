@@ -1,0 +1,31 @@
+{
+  "schema": "lm_trainer.fixture-index.v1",
+  "fixture_only": true,
+  "base_model": {
+    "model_type": "qwen2",
+    "revision": null,
+    "config_sha256": "623d3587c922fb912d2e20ecece566301eb49df8b00de7335fe09a448bd9cce1",
+    "weights_sha256": "14ccbc1680f637ea1a7c7a4400f6fbeb43fe14cd47323c8fba5ae9e3d78b648c",
+    "weight_files": {
+      "model.safetensors": "7851506db8eab09275b54f59ee23adb63f960b37a56d9a5bc88997d080e07968"
+    },
+    "weight_index_sha256": null
+  },
+  "generator": "examples.vision_support.task_b_workload:tiny_base(seed=805)",
+  "inference_adapters": [
+    {
+      "stage_name": "mixed_cpt",
+      "run_id": "0eb132bfb5f2a532b4d1f51b181a9230",
+      "path": "cpt",
+      "manifest_sha256": "4c16720532f5d821e8c2c0534de5911934de62e98470e7794f8e705be213d5e6",
+      "parent_adapter_sha256": null
+    },
+    {
+      "stage_name": "dialogue_sft",
+      "run_id": "ed232c88c6d8ac0f364c1aec71b20467",
+      "path": "sft",
+      "manifest_sha256": "8f8629e86ff34c43f9a23abb044166c03256712e3f898e81d9cf66aff49144c0",
+      "parent_adapter_sha256": "4c16720532f5d821e8c2c0534de5911934de62e98470e7794f8e705be213d5e6"
+    }
+  ]
+}

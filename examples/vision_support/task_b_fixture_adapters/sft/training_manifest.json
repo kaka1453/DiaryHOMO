@@ -1,0 +1,414 @@
+{
+  "artifact_kind": "inference_adapter",
+  "optimizer_updates": 4,
+  "schema": "lm_trainer.adapter-artifact.v1",
+  "adapter_format": "peft_lora_safetensors",
+  "run_id": "ed232c88c6d8ac0f364c1aec71b20467",
+  "stage_name": "dialogue_sft",
+  "objective": "assistant_only_messages",
+  "init_adapter": "continue_stage",
+  "seed": 72,
+  "base_model": {
+    "model_type": "qwen2",
+    "revision": null,
+    "config_sha256": "623d3587c922fb912d2e20ecece566301eb49df8b00de7335fe09a448bd9cce1",
+    "weights_sha256": "14ccbc1680f637ea1a7c7a4400f6fbeb43fe14cd47323c8fba5ae9e3d78b648c",
+    "weight_files": {
+      "model.safetensors": "7851506db8eab09275b54f59ee23adb63f960b37a56d9a5bc88997d080e07968"
+    },
+    "weight_index_sha256": null
+  },
+  "lora_config": {
+    "r": 4,
+    "alpha": 8,
+    "dropout": 0.0,
+    "bias": "none",
+    "target_modules": [
+      "q_proj",
+      "v_proj"
+    ]
+  },
+  "quantization": {
+    "mode": "none",
+    "implementation": null,
+    "quant_type": null,
+    "double_quant": null
+  },
+  "compute_dtype": "fp32",
+  "backend": "hf",
+  "data_release_id": "fictional_task_b_v1_train",
+  "manifest_sha256": "6c7d60c75b2ad29e03ca9b4e2f50d9b3309b8014fd782aee47a0d6f365b84688",
+  "split": "train",
+  "data_mode": "fixture",
+  "fixture_only": true,
+  "parent_adapter_sha256": "4c16720532f5d821e8c2c0534de5911934de62e98470e7794f8e705be213d5e6",
+  "resume_checkpoint_sha256": null,
+  "stage_config_sha256": "87de4091cf2f87adb26dcfd7a393ed9362fbba29d5a7e03ab10956d7e2858ff7",
+  "training_settings": {
+    "max_length": 256,
+    "quantization_mode": "none",
+    "batch_size": 1,
+    "shuffle": true,
+    "auto_pad_batch": true,
+    "epochs": 1,
+    "gradient_accumulation_steps": 2,
+    "lr": 0.002,
+    "warmup_steps": 0,
+    "max_steps": 4,
+    "save_steps": 2,
+    "seed": 72,
+    "num_workers": 0,
+    "pin_memory": false,
+    "lora_r": 4,
+    "lora_alpha": 8,
+    "lora_target_modules": [
+      "q_proj",
+      "v_proj"
+    ],
+    "lora_dropout": 0.0,
+    "lora_bias": "none",
+    "name": "dialogue_sft",
+    "base_revision": null,
+    "packing": false,
+    "dev_probe": true,
+    "dev_every": 2,
+    "save_probe_text": false,
+    "data_mode": "fixture",
+    "objective": "assistant_only_messages",
+    "sources": [
+      "dyadic_chat"
+    ],
+    "target_loss_token_share": "natural",
+    "token_budget": 2048,
+    "max_effective_epochs": null,
+    "max_sample_repeats": null,
+    "corpus_schema_allowlist": [
+      "lm_trainer.corpus.v1"
+    ],
+    "template_policy": {
+      "version": "lm_trainer.template-policy.v1",
+      "template_hash": null,
+      "stop_tokens": [
+        "<|im_end|>"
+      ],
+      "enable_thinking": null,
+      "control_tokens": [],
+      "system_prompt_sha256": null
+    },
+    "add_bos": false,
+    "add_eos": true,
+    "allow_eos_only": false,
+    "supervise_target_eos": true,
+    "overlength_policy": "reject",
+    "backend": "hf",
+    "compute_dtype": "fp32",
+    "gradient_checkpointing": "standard",
+    "benchmark_warmup_steps": 2
+  },
+  "environment": {
+    "packages": {
+      "torch": "2.14.0+cu130",
+      "transformers": "5.17.0",
+      "peft": "0.21.1",
+      "accelerate": "1.15.0",
+      "datasets": "5.0.1",
+      "bitsandbytes": "0.50.2",
+      "unsloth": null,
+      "unsloth-zoo": null,
+      "triton": "3.8.0",
+      "xformers": null,
+      "numpy": "2.5.3",
+      "safetensors": "0.8.0"
+    },
+    "python": "3.13.15 (main, Aug 25 2026, 14:01:07) [Clang 22.1.3 ]",
+    "source_sha256": {
+      "lm_trainer/train/engine.py": "5a0bf560deb380792c58f5c3ba13542e5777f9f7c57cbe452c2913793de245a7",
+      "lm_trainer/train/modeling.py": "9bc9213c38ea17bbcd182d030e43edce23b4d041ac2bef01b8c4101f1241bd49",
+      "lm_trainer/train/bootstrap.py": "4bf8191910ef9f635f436345f7d735d16c7ee6f112d4a7fb93337103f40762d4",
+      "lm_trainer/train/performance.py": "b86c46decf124334d80ee0f6022b9cb65a3d6d5c4c3ae39e86745469fc255d3f",
+      "lm_trainer/train/data.py": "68083bbcae885eb53f7908371dbb50f5fc765540d175b50a0eb6aa11bffd5a56",
+      "lm_trainer/train/schema.py": "8e90f08e416c5287f60be08d2964ebe208ccedcf4af38b4d3456b32b0c06afd4",
+      "lm_trainer/train/encoding.py": "317863b406fd0605d1aa7de276d77e177ba0a7e07287ee182d662ff43316eb9c",
+      "lm_trainer/train/sampling.py": "8fd58bf8c43ce140f5b25c4dd7833faccba9611d3fa7b2d99ca9f6fc089500f5",
+      "lm_trainer/train/schedule.py": "0770d3c72de3a760f1605cf2bbe8a827167b9be22b5129ddd32657b768cfc2c4",
+      "lm_trainer/train/stages.py": "1ecd1e55aa5fd8433014d21d34e31602dcbaaa77cfd321096074c2f0d48667c4",
+      "lm_trainer/train/artifacts.py": "fc366dac391ac8f243630e909f4ae5cf92c45ecf8343a398053107f63651aeba",
+      "lm_trainer/train/checkpoints.py": "28b12285b921ebdb9f14dc5abc007398da22476a94aee4f04459efa33db3364e",
+      "lm_trainer/train/dev.py": "f12cad5a6912271e86b9df56412e4e9d678a03e73d0a8ca9cb406acd753a5119",
+      "lm_trainer/train/reproducibility.py": "75677854086bbc65869462860463468cfe5f4168a9cb4156052cdc8434c70dd7",
+      "lm_trainer/model/loader.py": "24ae81d757dbb6c6fbdc9790defbfda15bfb7b035e6a54cb0f9abbc4b6211e85",
+      "lm_trainer/model/quantization.py": "e17596402c21375130417bb87c89c69f22b3df179c4756d7daa082bbfafa1732",
+      "lm_trainer/config/stages.py": "8831ef22ecbd89ab2d5c9319f6fe8cc5fad0f216855b59c3993bc820bc47eaf6",
+      "lm_trainer/template_policy.py": "9abeb3ba1a42f97bf5de29fc4239875c75df2a47c671e94b65956c7d1b51135d",
+      "lm_trainer/config/train_config.py": "25a3473e5372213a0a314f37764761ad731fe45459001842eb342e8904216e73"
+    },
+    "lock_sha256": {
+      "hf": "1fcdb9dfe514914f61d8d76844e5862403f3cd09086f6f8a0d10372a57271136",
+      "unsloth": "fcb62d290de4274cfae2bc011054485598951fa5c8bbeec23082ce21507943f6"
+    },
+    "device": "cpu",
+    "cuda": null,
+    "driver": null,
+    "cpu_threads": 1,
+    "deterministic": true
+  },
+  "tokenizer_hash": "ff19d8dc4bbeca2c3bed752d6c1e9012b5b358c039bc42156ef7bb4ebfabc0e2",
+  "template_policy": {
+    "version": "lm_trainer.template-policy.v1",
+    "template_hash": "d0d6560b9293943f6f3105f243767413424babdf9d64554cb1d38c913885524b",
+    "policy_sha256": "8f76a44e26cce402552536884a1a99d3fe8935f206b56b34b412e9778bea56e1",
+    "policy": {
+      "version": "lm_trainer.template-policy.v1",
+      "template_hash": "d0d6560b9293943f6f3105f243767413424babdf9d64554cb1d38c913885524b",
+      "stop_tokens": [
+        "<|im_end|>"
+      ],
+      "enable_thinking": null,
+      "control_tokens": [
+        "</think>",
+        "</tool_call>",
+        "</tool_response>",
+        "<pad>",
+        "<think>",
+        "<tool_call>",
+        "<tool_response>",
+        "<unk>",
+        "<|channel|>",
+        "<|im_end|>",
+        "<|im_start|>",
+        "<|message|>"
+      ],
+      "schema": "lm_trainer.template-policy.v1",
+      "role_map": {
+        "system": "system",
+        "user": "user",
+        "assistant": "assistant"
+      },
+      "visible_reply_only": true,
+      "stop_token_ids": [
+        2
+      ],
+      "control_token_ids": [
+        0,
+        2,
+        3
+      ],
+      "training_template_kwargs": {
+        "add_generation_prompt": false
+      },
+      "inference_template_kwargs": {
+        "add_generation_prompt": true
+      },
+      "system_prompt_sha256": null
+    }
+  },
+  "resume_identity_sha256": "eecb3d4bd4653b607118fc3c668710be1e10567e135072e9bf3652effc5a63f1",
+  "trainable_parameters": {
+    "trainable": 3584,
+    "total_parameter_elements": 366208,
+    "fraction": 0.009786787836420832,
+    "target_modules": [
+      "q_proj",
+      "v_proj"
+    ]
+  },
+  "start_adapter_sha256": "3883374579d74012b8dc0bd224091f1d34097a2e3f1fe8d74cff9545534869e8",
+  "loaded_adapter_sha256": "3883374579d74012b8dc0bd224091f1d34097a2e3f1fe8d74cff9545534869e8",
+  "frozen_parameter_sha256": "d84ddde4072a40eeb713b64c5c8b0efe4823d72581933383f07af8fcecadb5e7",
+  "stop_reason": "max_steps",
+  "adapter_weights_sha256": "e89261c655f60eb61d991abad721640ea0e35c2de2c1e7618a8e33c3e6400b5b",
+  "planned_vs_actual_tokens": {
+    "planned": {
+      "target_loss_token_share": {
+        "dyadic_chat": 1.0
+      },
+      "stop_reason": "no_eligible_complete_sample",
+      "sampling_exclusions": {
+        "max_sample_repeats": 16
+      },
+      "capacity_loss_tokens": 2048,
+      "capacity_unused_loss_tokens": 1040,
+      "max_sample_repeats": 1,
+      "max_effective_epochs": 1,
+      "token_budget": 2048,
+      "unused_budget_loss_tokens": 1484,
+      "optimizer_windows": 4,
+      "loss_tokens": 564,
+      "sources": {
+        "dyadic_chat": {
+          "samples": 16,
+          "events": 16,
+          "characters": 712,
+          "cross_stage_overlap_source_ids": 0,
+          "unique_body_tokens": 984,
+          "unique_eos_tokens": 24,
+          "unique_loss_tokens": 1008,
+          "unique_input_tokens": 2744,
+          "rejected": 0,
+          "truncated": 0,
+          "truncation_reasons": {},
+          "eos_only_samples": 0,
+          "length_quantiles": {
+            "p50": 128,
+            "p90": 248,
+            "p99": 248,
+            "max": 248
+          },
+          "eos_only_sample_share": 0.0,
+          "eos_target_share": 0.023809523809523808,
+          "sample_exposures": 8,
+          "sampled_loss_tokens": 564,
+          "sampled_body_tokens": 552,
+          "sampled_eos_tokens": 12,
+          "sampled_input_tokens": 1372,
+          "consumed_unique_loss_tokens": 564,
+          "consumed_unique_body_tokens": 552,
+          "consumed_unique_eos_tokens": 12,
+          "consumed_unique_input_tokens": 1372,
+          "sampled_truncated": 0,
+          "effective_epochs": 0.5595238095238095,
+          "planned_share": 1.0,
+          "actual_share": 1.0
+        }
+      },
+      "run_stop_reason": "max_steps"
+    },
+    "actual": {
+      "target_loss_token_share": {
+        "dyadic_chat": 1.0
+      },
+      "stop_reason": "no_eligible_complete_sample",
+      "sampling_exclusions": {
+        "max_sample_repeats": 16
+      },
+      "capacity_loss_tokens": 2048,
+      "capacity_unused_loss_tokens": 1040,
+      "max_sample_repeats": 1,
+      "max_effective_epochs": 1,
+      "token_budget": 2048,
+      "unused_budget_loss_tokens": 1484,
+      "optimizer_windows": 4,
+      "loss_tokens": 564,
+      "sources": {
+        "dyadic_chat": {
+          "samples": 16,
+          "events": 16,
+          "characters": 712,
+          "cross_stage_overlap_source_ids": 0,
+          "unique_body_tokens": 984,
+          "unique_eos_tokens": 24,
+          "unique_loss_tokens": 1008,
+          "unique_input_tokens": 2744,
+          "rejected": 0,
+          "truncated": 0,
+          "truncation_reasons": {},
+          "eos_only_samples": 0,
+          "length_quantiles": {
+            "p50": 128,
+            "p90": 248,
+            "p99": 248,
+            "max": 248
+          },
+          "eos_only_sample_share": 0.0,
+          "eos_target_share": 0.023809523809523808,
+          "sample_exposures": 8,
+          "sampled_loss_tokens": 564,
+          "sampled_body_tokens": 552,
+          "sampled_eos_tokens": 12,
+          "sampled_input_tokens": 1372,
+          "consumed_unique_loss_tokens": 564,
+          "consumed_unique_body_tokens": 552,
+          "consumed_unique_eos_tokens": 12,
+          "consumed_unique_input_tokens": 1372,
+          "sampled_truncated": 0,
+          "effective_epochs": 0.5595238095238095,
+          "planned_share": 1.0,
+          "actual_share": 1.0
+        }
+      }
+    }
+  },
+  "timing": {
+    "preflight_seconds": 0.02995665092021227,
+    "preprocess_seconds": 0.032647741958498955,
+    "model_load_seconds": 0.07470072992146015,
+    "initial_model_audit_seconds": 0.008838756009936333,
+    "save_seconds": 0.1135100768879056,
+    "dev_seconds": 0.15100209694355726,
+    "run_wall_seconds_including_setup_and_save": 0.7282137339934707
+  },
+  "performance_summary": {
+    "measured_updates": 2,
+    "measured_seconds": 0.1328761512413621,
+    "seconds_per_update": 0.06643807562068105,
+    "measured_samples": 4,
+    "samples_per_second": 30.103219897859802,
+    "measured_input_tokens": 626,
+    "input_tokens_per_second": 4711.153914015059,
+    "measured_loss_tokens": 282,
+    "loss_tokens_per_second": 2122.277002799116,
+    "peak_allocated_bytes": null,
+    "peak_reserved_bytes": null
+  },
+  "dev": {
+    "optimizer_updates": 4,
+    "split": "dev",
+    "manifest_sha256": "fe35e9c31a1a97e6982ded33f24e5b6ba0bfdb136fc702e50f74425f61ba8518",
+    "sources": {
+      "dyadic_chat": {
+        "loss_tokens": 269,
+        "samples": 3,
+        "loss": 5.484375717914681
+      }
+    },
+    "probe": {
+      "probe_id": "fictional_camera_dark_v1",
+      "generated_tokens": 16,
+      "stop_matched": false
+    }
+  },
+  "dev_history": [
+    {
+      "optimizer_updates": 2,
+      "split": "dev",
+      "manifest_sha256": "fe35e9c31a1a97e6982ded33f24e5b6ba0bfdb136fc702e50f74425f61ba8518",
+      "sources": {
+        "dyadic_chat": {
+          "loss_tokens": 269,
+          "samples": 3,
+          "loss": 5.5089699805447605
+        }
+      },
+      "probe": {
+        "probe_id": "fictional_camera_dark_v1",
+        "generated_tokens": 16,
+        "stop_matched": false
+      }
+    },
+    {
+      "optimizer_updates": 4,
+      "split": "dev",
+      "manifest_sha256": "fe35e9c31a1a97e6982ded33f24e5b6ba0bfdb136fc702e50f74425f61ba8518",
+      "sources": {
+        "dyadic_chat": {
+          "loss_tokens": 269,
+          "samples": 3,
+          "loss": 5.484375717914681
+        }
+      },
+      "probe": {
+        "probe_id": "fictional_camera_dark_v1",
+        "generated_tokens": 16,
+        "stop_matched": false
+      }
+    }
+  ],
+  "artifacts": {
+    "README.md": "21d64fb9e77bd9a161b9db38230b0d6c80bf0c42368fe8dccadcc3d4912c5b4a",
+    "adapter_config.json": "825088399e9528b512692178a6a19a5d1a43e990623f6cdfee8779606b4c4851",
+    "adapter_model.safetensors": "381b0879475a6f2f16c13d91a3545697c112144a7aa4b94fa9d94b864ab654b1",
+    "chat_template.jinja": "d0d6560b9293943f6f3105f243767413424babdf9d64554cb1d38c913885524b",
+    "tokenizer.json": "0de627e6f288b7b2ba62e2f7fee64991f17cc8b3d691c70de1152a99575dd5ba",
+    "tokenizer_config.json": "c49518b86ef621abb456a957772404a3303d45a97bbc6e27a026b9b8f9636acf"
+  }
+}

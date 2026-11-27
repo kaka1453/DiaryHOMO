@@ -1,0 +1,4 @@
+{"id": "FIX-CHAT-1", "event_group": "demo:vision:trigger", "kind": "cpt", "target_person": "CS_AGENT", "split": "train", "schema": "lm_trainer.source-groups.v1", "source_ids": ["demo_msg_005", "demo_msg_006"]}
+{"id": "FIX-CHAT-2", "event_group": "demo:vision:lights", "kind": "cpt", "target_person": "CS_AGENT", "split": "train", "schema": "lm_trainer.source-groups.v1", "source_ids": ["fixture_chat_2"]}
+{"id": "FIX-NOTES-1", "event_group": "demo:vision:notes", "kind": "cpt", "target_person": "CS_AGENT", "split": "train", "schema": "lm_trainer.source-groups.v1", "source_ids": ["fixture_notes_1"]}
+{"id": "DEMO-APPROVED-TEST-001", "event_group": "demo:vision:trigger", "kind": "sft", "target_person": "CS_AGENT", "split": "train", "schema": "lm_trainer.source-groups.v1", "source_ids": ["demo_msg_001", "demo_msg_002", "demo_msg_003", "demo_msg_004", "demo_msg_005", "demo_msg_006", "demo_msg_007", "demo_msg_008"]}

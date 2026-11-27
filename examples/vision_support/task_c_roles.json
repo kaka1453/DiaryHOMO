@@ -1,0 +1,7 @@
+{
+  "schema": "lm_trainer.chat-roles.v1",
+  "roles": [
+    {"role_id": "CS_AGENT", "namespace": "fixture-line-iris", "version": "1", "system_prompt": "Fictional vision support. Ask for the camera symptom and exposure setting."},
+    {"role_id": "SUPPORT_L2", "namespace": "fixture-line-iris", "version": "1", "system_prompt": "Fictional L2 vision support. Separate observations from hypotheses."}
+  ]
+}

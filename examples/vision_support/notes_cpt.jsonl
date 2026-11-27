@@ -1,0 +1,1 @@
+{"schema":"corpus.v1","id":"DEMO-D001","kind":"cpt","target_person":"CS_AGENT","event_group":"demo:vision:notes","source_index_ref":"sample_source_index.jsonl#DEMO-D001","permissions":{"local_review":true,"train":false,"external":false},"review_status":"pending_owner","split":"unassigned","text":"今日排查发现，触发计数与采集帧数应先分别确认。\n\n此前只看缺陷报警数量，容易把漏拍误当作漏检。后续将采集链路和识别链路分开验证，并记录修改前后的曝光参数。"}

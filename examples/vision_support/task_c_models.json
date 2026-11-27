@@ -1,0 +1,45 @@
+{
+  "schema": "lm_trainer.chat-models.v1",
+  "models": [
+    {
+      "model_id": "base",
+      "base_path": "../../.cache/task-c-prepared/base",
+      "fixture_only": true,
+      "context_limit": 2048,
+      "template_policy": {
+        "template_hash": "d0d6560b9293943f6f3105f243767413424babdf9d64554cb1d38c913885524b",
+        "stop_tokens": [
+          "<|im_end|>"
+        ]
+      }
+    },
+    {
+      "model_id": "cpt_stage1",
+      "adapter_path": "task_b_fixture_adapters/cpt",
+      "manifest_sha256": "4c16720532f5d821e8c2c0534de5911934de62e98470e7794f8e705be213d5e6",
+      "base_path": "../../.cache/task-c-prepared/base",
+      "fixture_only": true,
+      "context_limit": 2048,
+      "template_policy": {
+        "template_hash": "d0d6560b9293943f6f3105f243767413424babdf9d64554cb1d38c913885524b",
+        "stop_tokens": [
+          "<|im_end|>"
+        ]
+      }
+    },
+    {
+      "model_id": "sft_final",
+      "adapter_path": "task_b_fixture_adapters/sft",
+      "manifest_sha256": "8f8629e86ff34c43f9a23abb044166c03256712e3f898e81d9cf66aff49144c0",
+      "base_path": "../../.cache/task-c-prepared/base",
+      "fixture_only": true,
+      "context_limit": 2048,
+      "template_policy": {
+        "template_hash": "d0d6560b9293943f6f3105f243767413424babdf9d64554cb1d38c913885524b",
+        "stop_tokens": [
+          "<|im_end|>"
+        ]
+      }
+    }
+  ]
+}
