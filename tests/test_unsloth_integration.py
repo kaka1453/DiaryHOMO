@@ -15,10 +15,22 @@ from diary_core.config.train_config import (
 from diary_core.train.performance import summarize_updates
 
 ROOT = Path(__file__).resolve().parents[1]
+EXAMPLE_ASSET_ROOT = str(ROOT / "product_assets" / "example")
+EXAMPLE_MODEL_DIR = str(ROOT / "product_assets" / "example" / "assets")
 
 
 def runtime(*args):
-    return build_train_runtime_config(build_train_parser().parse_args(list(args)))
+    return build_train_runtime_config(
+        build_train_parser().parse_args(
+            [
+                "--asset-root",
+                EXAMPLE_ASSET_ROOT,
+                "--external-base-model",
+                EXAMPLE_MODEL_DIR,
+                *args,
+            ]
+        )
+    )
 
 
 def test_defaults_preserve_hf():
@@ -55,7 +67,7 @@ def test_unsloth_config_and_cli():
     "args",
     [
         ("--backend", "bad"),
-        ("--compute-dtype", "fp32"),
+        ("--compute-dtype", "fp64"),
         ("--backend", "unsloth", "--quantization-mode", "8bit"),
         ("--gradient-checkpointing", "unsloth"),
         ("--benchmark-warmup-steps", "-1"),
@@ -67,17 +79,19 @@ def test_bad_options(args):
         runtime(*args)
 
 
-def test_bootstrap_import_order_and_dry_run():
-    code = """
+def test_bootstrap_import_order_and_dry_run(tmp_path):
+    model_dir = tmp_path / "model"
+    model_dir.mkdir()
+    code = f"""
 import sys
 from train.train import build_parser, build_runtime_config
 from diary_core.train.engine import train
-build_runtime_config(build_parser().parse_args(['--backend', 'unsloth', '--quantization-mode', 'none']))
+build_runtime_config(build_parser().parse_args(['--asset-root', {EXAMPLE_ASSET_ROOT!r}, '--external-base-model', {str(model_dir)!r}, '--backend', 'unsloth', '--quantization-mode', 'none']))
 assert not any(name in sys.modules for name in ('torch', 'transformers', 'peft', 'trl', 'unsloth'))
 from diary_core.train.bootstrap import initialize_backend
 sys.modules['transformers'] = object()
 try:
-    initialize_backend({'backend': 'unsloth'})
+    initialize_backend({{'backend': 'unsloth'}})
 except RuntimeError as exc:
     assert '必须先导入' in str(exc)
 else:
@@ -88,6 +102,10 @@ else:
         [
             sys.executable,
             str(ROOT / "train/train.py"),
+            "--asset-root",
+            EXAMPLE_ASSET_ROOT,
+            "--external-base-model",
+            str(model_dir),
             "--backend",
             "unsloth",
             "--quantization-mode",
