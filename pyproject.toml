@@ -1,0 +1,51 @@
+[project]
+name = "locall-train"
+version = "0.1.0"
+description = "Local LoRA training and inference environment"
+requires-python = ">=3.13.15,<3.14"
+dependencies = [
+    "torch==2.14.0+cu130",
+    "transformers==5.17.0",
+    "datasets==5.0.1",
+    "accelerate==1.15.0",
+    "peft==0.21.1",
+    "bitsandbytes==0.50.2",
+    "safetensors==0.8.0",
+    "PyYAML==6.0.2",
+    "tqdm==4.67.1",
+    "matplotlib==3.10.7",
+    "sentencepiece==0.2.1",
+    "tiktoken==0.12.0",
+]
+
+[project.optional-dependencies]
+# 预留：后续接入 SFT 时再单独验收，不与当前训练循环混装。
+# sft = ["trl==1.14.1"]
+
+[dependency-groups]
+ui = ["gradio==6.29.0"]
+dev = [
+    "pytest==9.1.1",
+    "ruff==0.16.9",
+]
+
+[tool.uv]
+package = false
+concurrent-downloads = 2
+concurrent-installs = 2
+
+[[tool.uv.index]]
+name = "tuna"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu130" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

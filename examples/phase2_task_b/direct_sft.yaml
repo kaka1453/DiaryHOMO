@@ -1,0 +1,24 @@
+model_name_or_path: base
+manifest_path: joint/manifest.json
+output_dir: runs/direct_sft
+name: dialogue_sft
+init_adapter: new
+data_mode: fixture
+objective: assistant_only_messages
+corpus_schema_allowlist: [conversation.stage3.structured.v3]
+backend: hf
+compute_dtype: fp32
+quantization_mode: none
+max_length: 1024
+batch_size: 1
+gradient_accumulation_steps: 3
+lr: 0.002
+max_steps: 4
+seed: 72
+save_steps: 1
+packing: false
+supervise_target_eos: true
+target_loss_token_share: natural
+template_policy:
+  stop_tokens: ['<|im_end|>']
+  system_prompt: '你是虚构设备客服。区分已知和待确认事实。'

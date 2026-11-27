@@ -1,0 +1,29 @@
+# For offline --dry-run / --validate-release / --simulate-only only.
+# Supply local paths for model, manifest, and output via CLI overrides.
+model_name_or_path: local-tokenizer
+checkpoint_dir: unused-output
+quantization_mode: none
+backend: hf
+compute_dtype: fp32
+max_length: 1024
+batch_size: 2
+shuffle: false
+auto_pad_batch: true
+epochs: 1
+gradient_accumulation_steps: 2
+lr: 0.0001
+warmup_steps: 0
+max_steps: 4
+save_steps: 20
+seed: 7
+num_workers: 0
+pin_memory: false
+
+data_mode: fixture
+objective: assistant_only_messages
+manifest_path: fixture/manifest.json
+corpus_schema_allowlist: [conversation.stage3.structured.v3]
+supervise_target_eos: true
+template_policy:
+  stop_tokens: ['<|im_end|>']
+  enable_thinking: false

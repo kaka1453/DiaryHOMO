@@ -1,6 +1,31 @@
 {
   "files": {
+    "lm_trainer/CONVERSATION_RENDERER_CONTRACT.md": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "bb1b3b3b97e36d4be534d9ec1dfb3664f482ffa8da18ea531d9d89d05f5de321",
+        436
+      ],
+      "target": [
+        "bb1b3b3b97e36d4be534d9ec1dfb3664f482ffa8da18ea531d9d89d05f5de321",
+        436
+      ]
+    },
+    "lm_trainer/INFERENCE_SERVICE_CONTRACT.md": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "2fceec4cc8ed1e0ac472b3f5ab78ce791707af7abf8844a0d40543f7d303ea20",
+        436
+      ],
+      "target": [
+        "2fceec4cc8ed1e0ac472b3f5ab78ce791707af7abf8844a0d40543f7d303ea20",
+        436
+      ]
+    },
     "lm_trainer/LICENSE": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "947b92662ffa980a4833e08e2d89d941b776665b71ed403b7d34283206f5801a",
@@ -8,10 +33,23 @@
       ],
       "target": [
         "947b92662ffa980a4833e08e2d89d941b776665b71ed403b7d34283206f5801a",
-        420
+        436
+      ]
+    },
+    "lm_trainer/MEMORY_RAG_CONTRACT.md": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "5136c95c3a3e46fde40750c8c44b25ab9ae38a5918942fcea07bfdba79e114ce",
+        436
+      ],
+      "target": [
+        "5136c95c3a3e46fde40750c8c44b25ab9ae38a5918942fcea07bfdba79e114ce",
+        436
       ]
     },
     "lm_trainer/README.md": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "26b7e3eb90aba9b10c733d3932876c130eb9d96e0e9d3b84ee961373390f798b",
@@ -19,14 +57,15 @@
       ],
       "target": [
         "26b7e3eb90aba9b10c733d3932876c130eb9d96e0e9d3b84ee961373390f798b",
-        420
+        436
       ]
     },
     "lm_trainer/TASK_A_CONTRACT.md": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "68222124fc8ea441395c8b9462902e23665ae6b859d83b7eb6d4724c0ec1a1f9",
-        436
+        420
       ],
       "target": [
         "68222124fc8ea441395c8b9462902e23665ae6b859d83b7eb6d4724c0ec1a1f9",
@@ -34,10 +73,11 @@
       ]
     },
     "lm_trainer/TASK_B_CONTRACT.md": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "fc04eaba000dcf27ba449e7b5df59a98c45c52ab4865216ac197532b912bb32d",
-        436
+        420
       ],
       "target": [
         "fc04eaba000dcf27ba449e7b5df59a98c45c52ab4865216ac197532b912bb32d",
@@ -45,10 +85,11 @@
       ]
     },
     "lm_trainer/TASK_C_CONTRACT.md": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "caefce5e5a918a9c7014d760b8f3f6b3fc04f38b1251a87b55d28a8ba818442b",
-        436
+        420
       ],
       "target": [
         "caefce5e5a918a9c7014d760b8f3f6b3fc04f38b1251a87b55d28a8ba818442b",
@@ -56,6 +97,7 @@
       ]
     },
     "lm_trainer/THIRD_PARTY_LICENSE.txt": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "c58fae9a6375612b002745f0f0c88a09360307b208c60456581f6061994c921d",
@@ -63,10 +105,23 @@
       ],
       "target": [
         "c58fae9a6375612b002745f0f0c88a09360307b208c60456581f6061994c921d",
-        420
+        436
+      ]
+    },
+    "lm_trainer/TRAINER_OPTIMIZATION_CONTRACT.md": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "938464608522da382a67e9c957b301b9f8dc9e5b57208e275c66695cf3f44b76",
+        436
+      ],
+      "target": [
+        "938464608522da382a67e9c957b301b9f8dc9e5b57208e275c66695cf3f44b76",
+        436
       ]
     },
     "lm_trainer/__init__.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "2c34c57bda954570993314535acb4fcde245d0c679d1e331ec2c1c986a86a05c",
@@ -74,25 +129,27 @@
       ],
       "target": [
         "2c34c57bda954570993314535acb4fcde245d0c679d1e331ec2c1c986a86a05c",
-        420
+        436
       ]
     },
     "lm_trainer/__main__.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "7fdad78c1d2b7a09ee13f66782bcd7db2263d746e2dc66cd6da56334c0175159",
+        "d204aded4435afc143c403925ca5db5a34a49c4ca09a85b0cbb294c27cdbc9da",
         420
       ],
       "target": [
-        "7fdad78c1d2b7a09ee13f66782bcd7db2263d746e2dc66cd6da56334c0175159",
+        "d204aded4435afc143c403925ca5db5a34a49c4ca09a85b0cbb294c27cdbc9da",
         420
       ]
     },
     "lm_trainer/chat/__init__.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "29f987b86974571f257fbc8d6865ede8df7c23d7122e22fc8e18db6ede4c3ddf",
-        436
+        420
       ],
       "target": [
         "29f987b86974571f257fbc8d6865ede8df7c23d7122e22fc8e18db6ede4c3ddf",
@@ -100,10 +157,11 @@
       ]
     },
     "lm_trainer/chat/__main__.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "14d13a17b9413fe1af7eea085a150fba902a47b5f89491e9353eff98a20402b8",
-        436
+        420
       ],
       "target": [
         "14d13a17b9413fe1af7eea085a150fba902a47b5f89491e9353eff98a20402b8",
@@ -111,72 +169,91 @@
       ]
     },
     "lm_trainer/chat/backend.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "99fae197d30003e726a43e93872dc93c2767d236b6ee029e7c0ee86e33966ea7",
-        436
+        "879fd2c7fa5bb8dc1f3d68a10e7b5364c7166c4ff389d17f77ab5763801f5e0a",
+        420
       ],
       "target": [
-        "99fae197d30003e726a43e93872dc93c2767d236b6ee029e7c0ee86e33966ea7",
-        436
+        "879fd2c7fa5bb8dc1f3d68a10e7b5364c7166c4ff389d17f77ab5763801f5e0a",
+        420
       ]
     },
     "lm_trainer/chat/context.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "ff13ba2dcd09e30744e0f3ba9185a3d2d0b369c061fc4720bba1427ce2d04db2",
+        "341b938d02a7fe3d623165cf86635f0e7e2c7b80aacfe967424414866d351a39",
+        420
+      ],
+      "target": [
+        "341b938d02a7fe3d623165cf86635f0e7e2c7b80aacfe967424414866d351a39",
+        420
+      ]
+    },
+    "lm_trainer/chat/inference.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "6799730a0089044637c6e853e8d21c93848c519961335aa18bb01fbcf556406a",
         436
       ],
       "target": [
-        "ff13ba2dcd09e30744e0f3ba9185a3d2d0b369c061fc4720bba1427ce2d04db2",
+        "6799730a0089044637c6e853e8d21c93848c519961335aa18bb01fbcf556406a",
         436
       ]
     },
     "lm_trainer/chat/memory.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "4c6d8d44674902a42d3127a701198b6117b99b7d233ee0d021e9d2e95e6f988a",
-        436
+        "288434539d07b937f523e69b4b7d06ad33a7137640c71bbc96322db874723307",
+        420
       ],
       "target": [
-        "4c6d8d44674902a42d3127a701198b6117b99b7d233ee0d021e9d2e95e6f988a",
-        436
+        "288434539d07b937f523e69b4b7d06ad33a7137640c71bbc96322db874723307",
+        420
       ]
     },
     "lm_trainer/chat/registry.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "6024333a742a3898600e3d903bf83e907240cce326ae259b8c12abd7bcefcb3d",
-        436
+        "2221d42aa80bb126a604db6d940070c337f5465764f6b61ce2be4cb619a15a0b",
+        420
       ],
       "target": [
-        "6024333a742a3898600e3d903bf83e907240cce326ae259b8c12abd7bcefcb3d",
-        436
+        "2221d42aa80bb126a604db6d940070c337f5465764f6b61ce2be4cb619a15a0b",
+        420
       ]
     },
     "lm_trainer/chat/runtime.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "241e27ebefae19a3baf7dcda0e46f1efb155a3186eb035d3a16c06024d3bd7d4",
-        436
+        "d10a2656edbfd2b72a27d723fc9cf00b89828c36f9b6788baea9be9a9b885630",
+        420
       ],
       "target": [
-        "241e27ebefae19a3baf7dcda0e46f1efb155a3186eb035d3a16c06024d3bd7d4",
-        436
+        "d10a2656edbfd2b72a27d723fc9cf00b89828c36f9b6788baea9be9a9b885630",
+        420
       ]
     },
     "lm_trainer/chat/types.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "1c52e6824bdbf41360d761be6c480104964bd59e012b35a9ab2100d0f7443fdc",
-        436
+        "364cf71b606d55ada4ebf15386f5ccec77f2fa3f001b37ebbb01043419abf625",
+        420
       ],
       "target": [
-        "1c52e6824bdbf41360d761be6c480104964bd59e012b35a9ab2100d0f7443fdc",
-        436
+        "364cf71b606d55ada4ebf15386f5ccec77f2fa3f001b37ebbb01043419abf625",
+        420
       ]
     },
     "lm_trainer/config/__init__.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "3e14f4b9d65cccc805cce6f6662b06d506a9edae4a609f2a58f8c3203b8679d4",
@@ -184,10 +261,11 @@
       ],
       "target": [
         "3e14f4b9d65cccc805cce6f6662b06d506a9edae4a609f2a58f8c3203b8679d4",
-        420
+        436
       ]
     },
     "lm_trainer/config/common.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "83551953559819d9b96c135f05a40e3558c15c693d5417605095d67b13f7085d",
@@ -195,21 +273,23 @@
       ],
       "target": [
         "83551953559819d9b96c135f05a40e3558c15c693d5417605095d67b13f7085d",
-        420
+        436
       ]
     },
     "lm_trainer/config/stages.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "8831ef22ecbd89ab2d5c9319f6fe8cc5fad0f216855b59c3993bc820bc47eaf6",
-        436
+        "08f6ff56d51adfbfaca4a14750d9e8037d55aea25baa611552116f5aef72b1e5",
+        420
       ],
       "target": [
-        "8831ef22ecbd89ab2d5c9319f6fe8cc5fad0f216855b59c3993bc820bc47eaf6",
-        436
+        "08f6ff56d51adfbfaca4a14750d9e8037d55aea25baa611552116f5aef72b1e5",
+        420
       ]
     },
     "lm_trainer/config/train_config.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "25a3473e5372213a0a314f37764761ad731fe45459001842eb342e8904216e73",
@@ -217,14 +297,51 @@
       ],
       "target": [
         "25a3473e5372213a0a314f37764761ad731fe45459001842eb342e8904216e73",
-        420
+        436
+      ]
+    },
+    "lm_trainer/conversation/__init__.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "398030f8438f16c82fff003119cbf8bf0616459124dbaaf53a03cbffa69c87f5",
+        436
+      ],
+      "target": [
+        "398030f8438f16c82fff003119cbf8bf0616459124dbaaf53a03cbffa69c87f5",
+        436
+      ]
+    },
+    "lm_trainer/conversation/contract.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "cce8cd5cdd1c58dbfaf1b5d1131f2052b11dcfc6ae76c52f467c844d857ad9a1",
+        436
+      ],
+      "target": [
+        "cce8cd5cdd1c58dbfaf1b5d1131f2052b11dcfc6ae76c52f467c844d857ad9a1",
+        436
+      ]
+    },
+    "lm_trainer/conversation/renderer.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "4bd6fc7fe5ca9400033ee0d18cee53f015cb297b2540d936befc05570f8ae602",
+        436
+      ],
+      "target": [
+        "4bd6fc7fe5ca9400033ee0d18cee53f015cb297b2540d936befc05570f8ae602",
+        436
       ]
     },
     "lm_trainer/eval/__init__.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "20bff8f7c170639ca6f32af1c441c90085acada60e5760992adc165b3b49a648",
-        436
+        420
       ],
       "target": [
         "20bff8f7c170639ca6f32af1c441c90085acada60e5760992adc165b3b49a648",
@@ -232,43 +349,59 @@
       ]
     },
     "lm_trainer/eval/__main__.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "e3ccb5d18cf0592e8e60554f68e6322b59191c97e3e6c428bbf2c53f8f2e96fc",
-        436
+        "1559c2bab1aad5a30e39368dafb436a186c36e47211defa8ce31e0e7821eb14c",
+        420
       ],
       "target": [
-        "e3ccb5d18cf0592e8e60554f68e6322b59191c97e3e6c428bbf2c53f8f2e96fc",
-        436
+        "1559c2bab1aad5a30e39368dafb436a186c36e47211defa8ce31e0e7821eb14c",
+        420
       ]
     },
     "lm_trainer/eval/blind.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "ab63b768540d8b10771689e2962af23cf70a53152b76abe4072fb8cdae9a7ce2",
-        436
+        "b05866f098f1fdb9175c25a880a8dc3677923ae1599701db2bb50ab7d7ae398f",
+        420
       ],
       "target": [
-        "ab63b768540d8b10771689e2962af23cf70a53152b76abe4072fb8cdae9a7ce2",
-        436
+        "b05866f098f1fdb9175c25a880a8dc3677923ae1599701db2bb50ab7d7ae398f",
+        420
       ]
     },
     "lm_trainer/eval/cards.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "1713c4297d29ce7da01c2d0eb98fad7fd6d15a5179db2a5d85e48c0ae41579ec",
-        436
+        420
       ],
       "target": [
         "1713c4297d29ce7da01c2d0eb98fad7fd6d15a5179db2a5d85e48c0ae41579ec",
+        436
+      ]
+    },
+    "lm_trainer/eval/memory_rag.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "91ba712ea971b560c18e017d8454db11a41832dd3064fc2fc43bd77c2cc34af1",
+        436
+      ],
+      "target": [
+        "91ba712ea971b560c18e017d8454db11a41832dd3064fc2fc43bd77c2cc34af1",
         436
       ]
     },
     "lm_trainer/eval/provider.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "807e46b1b36ce1f99319678f7053a4d20f799ccace75940465720f09476c3c00",
-        436
+        420
       ],
       "target": [
         "807e46b1b36ce1f99319678f7053a4d20f799ccace75940465720f09476c3c00",
@@ -276,39 +409,43 @@
       ]
     },
     "lm_trainer/eval/report.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "3444aaad0333a8c1cf29b8dd0b7c5896ad6a3c2d3ce2728d1e92fc8e53c11c5f",
-        436
+        "2e25f113477cd314e7cac45c87c85fee34ff9569091b864598bc3e7908c460f7",
+        420
       ],
       "target": [
-        "3444aaad0333a8c1cf29b8dd0b7c5896ad6a3c2d3ce2728d1e92fc8e53c11c5f",
-        436
+        "2e25f113477cd314e7cac45c87c85fee34ff9569091b864598bc3e7908c460f7",
+        420
       ]
     },
     "lm_trainer/eval/runner.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "66561e5a20874b7558212c752796fd3f8457e92aab325fc42f4685c8a2ef743a",
-        436
+        "c4198f1c7d7ddcd722aa06a161973f30ef904cef1d81046275dbcbcd9ac5667e",
+        420
       ],
       "target": [
-        "66561e5a20874b7558212c752796fd3f8457e92aab325fc42f4685c8a2ef743a",
-        436
+        "c4198f1c7d7ddcd722aa06a161973f30ef904cef1d81046275dbcbcd9ac5667e",
+        420
       ]
     },
     "lm_trainer/eval/schema.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "54b2fe5d9d283e0febbd556a2ef0807e03d8bd06e3a5240ae669564b4c0f6559",
-        436
+        "e8dafe317742b7ca785dd2a7ed39172d2e1021165eae5fc53c1e9258ef6c0c5e",
+        420
       ],
       "target": [
-        "54b2fe5d9d283e0febbd556a2ef0807e03d8bd06e3a5240ae669564b4c0f6559",
-        436
+        "e8dafe317742b7ca785dd2a7ed39172d2e1021165eae5fc53c1e9258ef6c0c5e",
+        420
       ]
     },
     "lm_trainer/generation.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "ee560a774e5044078662e114719c69e523c3b9d894b8d76d4f95f8aa9dba41e2",
@@ -316,10 +453,83 @@
       ],
       "target": [
         "ee560a774e5044078662e114719c69e523c3b9d894b8d76d4f95f8aa9dba41e2",
-        420
+        436
+      ]
+    },
+    "lm_trainer/memory/__init__.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "286e98b251a2c27b743668450ff4e939b1bb22142a6d79f34a8dd288d263061f",
+        436
+      ],
+      "target": [
+        "286e98b251a2c27b743668450ff4e939b1bb22142a6d79f34a8dd288d263061f",
+        436
+      ]
+    },
+    "lm_trainer/memory/__main__.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "d8643864d594b4734447e4d91e68cc05d89f0b3a304095e1e80f152e07280965",
+        436
+      ],
+      "target": [
+        "d8643864d594b4734447e4d91e68cc05d89f0b3a304095e1e80f152e07280965",
+        436
+      ]
+    },
+    "lm_trainer/memory/import-v1.schema.json": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "08c1660af777a8532d66f76e12377a56e253ecdb4f839ce79ae511fba7dd65cf",
+        436
+      ],
+      "target": [
+        "08c1660af777a8532d66f76e12377a56e253ecdb4f839ce79ae511fba7dd65cf",
+        436
+      ]
+    },
+    "lm_trainer/memory/provider.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "c746126e512d0c652ce02a7f5aaeb37a21a96027ca7e1f1e520d31d4e300f656",
+        436
+      ],
+      "target": [
+        "c746126e512d0c652ce02a7f5aaeb37a21a96027ca7e1f1e520d31d4e300f656",
+        436
+      ]
+    },
+    "lm_trainer/memory/schema.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "ac77d6bea5007fa34ce8fc4cef66c55261eadfba3175cdba861f877a5f3dca90",
+        436
+      ],
+      "target": [
+        "ac77d6bea5007fa34ce8fc4cef66c55261eadfba3175cdba861f877a5f3dca90",
+        436
+      ]
+    },
+    "lm_trainer/memory/store.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "e254e830ec2bc719433dcafe82f366def478bb8698ecd9d095c45224f662b11d",
+        436
+      ],
+      "target": [
+        "e254e830ec2bc719433dcafe82f366def478bb8698ecd9d095c45224f662b11d",
+        436
       ]
     },
     "lm_trainer/model/__init__.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "22ce74ea7a4a43be8afe75e32d9a16b029f9b839474681a6964009f9acdb18cd",
@@ -327,10 +537,11 @@
       ],
       "target": [
         "22ce74ea7a4a43be8afe75e32d9a16b029f9b839474681a6964009f9acdb18cd",
-        420
+        436
       ]
     },
     "lm_trainer/model/loader.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "24ae81d757dbb6c6fbdc9790defbfda15bfb7b035e6a54cb0f9abbc4b6211e85",
@@ -338,10 +549,11 @@
       ],
       "target": [
         "24ae81d757dbb6c6fbdc9790defbfda15bfb7b035e6a54cb0f9abbc4b6211e85",
-        420
+        436
       ]
     },
     "lm_trainer/model/quantization.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "e17596402c21375130417bb87c89c69f22b3df179c4756d7daa082bbfafa1732",
@@ -349,10 +561,11 @@
       ],
       "target": [
         "e17596402c21375130417bb87c89c69f22b3df179c4756d7daa082bbfafa1732",
-        420
+        436
       ]
     },
     "lm_trainer/requirements.txt": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "37b7b647efc8bdfbdff86dffdecb852e376954a49c246de929fe368d5abc37e6",
@@ -360,14 +573,51 @@
       ],
       "target": [
         "37b7b647efc8bdfbdff86dffdecb852e376954a49c246de929fe368d5abc37e6",
-        420
+        436
+      ]
+    },
+    "lm_trainer/serve/__init__.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "9963a0c61d9b132ac4a6eb9b40957deb90c3d6948b6cf324782e11cf54f501a2",
+        436
+      ],
+      "target": [
+        "9963a0c61d9b132ac4a6eb9b40957deb90c3d6948b6cf324782e11cf54f501a2",
+        436
+      ]
+    },
+    "lm_trainer/serve/__main__.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "0b0c0a0dc1947229fed4880303b08d558d3dcc3a47f66ab998d6bdede3b3c621",
+        436
+      ],
+      "target": [
+        "0b0c0a0dc1947229fed4880303b08d558d3dcc3a47f66ab998d6bdede3b3c621",
+        436
+      ]
+    },
+    "lm_trainer/serve/app.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "b8d2ec6f5963f0a6dcecc470f9ab4c0e3a7e787f826bb4c2e587bf8d25d64ea3",
+        436
+      ],
+      "target": [
+        "b8d2ec6f5963f0a6dcecc470f9ab4c0e3a7e787f826bb4c2e587bf8d25d64ea3",
+        436
       ]
     },
     "lm_trainer/template_policy.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "9abeb3ba1a42f97bf5de29fc4239875c75df2a47c671e94b65956c7d1b51135d",
-        436
+        420
       ],
       "target": [
         "9abeb3ba1a42f97bf5de29fc4239875c75df2a47c671e94b65956c7d1b51135d",
@@ -375,6 +625,7 @@
       ]
     },
     "lm_trainer/tests/test_contract.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "cd19d9530b719dc3df3badc25e0963185c062d0ca7d94de27ea01f8da9cf5e11",
@@ -382,10 +633,23 @@
       ],
       "target": [
         "cd19d9530b719dc3df3badc25e0963185c062d0ca7d94de27ea01f8da9cf5e11",
-        420
+        436
+      ]
+    },
+    "lm_trainer/tests/test_conversation_renderer.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "3600629f9dca0fd58f33de47b2e4df4072d80569b209456572cf23971b209be6",
+        436
+      ],
+      "target": [
+        "3600629f9dca0fd58f33de47b2e4df4072d80569b209456572cf23971b209be6",
+        436
       ]
     },
     "lm_trainer/tests/test_hf.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "fdfa47c069eb682e3cf813cfcb972c4c6caf5449ae0345021a005bd19c5d7f0b",
@@ -393,14 +657,39 @@
       ],
       "target": [
         "fdfa47c069eb682e3cf813cfcb972c4c6caf5449ae0345021a005bd19c5d7f0b",
-        420
+        436
+      ]
+    },
+    "lm_trainer/tests/test_inference_service.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "6927e485daa5d0302139b0cfaa09c0c04c00763a3a6c8a5ca75b2e77e9ac981b",
+        436
+      ],
+      "target": [
+        "6927e485daa5d0302139b0cfaa09c0c04c00763a3a6c8a5ca75b2e77e9ac981b",
+        436
+      ]
+    },
+    "lm_trainer/tests/test_memory_rag.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "ea006eb03b41053859a20bd906d2e04c8bbe7aebf936e321be387a777db95335",
+        436
+      ],
+      "target": [
+        "ea006eb03b41053859a20bd906d2e04c8bbe7aebf936e321be387a777db95335",
+        436
       ]
     },
     "lm_trainer/tests/test_task_a.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "fc73c785640ee4091dd679f6096b3747b61a3d711d3c0ccc6ab71b622852b2a3",
-        436
+        420
       ],
       "target": [
         "fc73c785640ee4091dd679f6096b3747b61a3d711d3c0ccc6ab71b622852b2a3",
@@ -408,10 +697,11 @@
       ]
     },
     "lm_trainer/tests/test_task_b.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "030920e29dcf791685b6bbc47a8cb99ed17c92b1df31c86efe108ae7c1351ea0",
-        436
+        420
       ],
       "target": [
         "030920e29dcf791685b6bbc47a8cb99ed17c92b1df31c86efe108ae7c1351ea0",
@@ -419,10 +709,11 @@
       ]
     },
     "lm_trainer/tests/test_task_c.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "a8557769f80e8e6598c1dee8ac925aedb5d13fb934239f65b783a85f874124a1",
-        436
+        420
       ],
       "target": [
         "a8557769f80e8e6598c1dee8ac925aedb5d13fb934239f65b783a85f874124a1",
@@ -430,10 +721,11 @@
       ]
     },
     "lm_trainer/tests/test_task_d.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "529f952d7242de3bbe6551f6e8b0c3129ad1288a4ae3a6029512bc27ce0c7e68",
-        436
+        420
       ],
       "target": [
         "529f952d7242de3bbe6551f6e8b0c3129ad1288a4ae3a6029512bc27ce0c7e68",
@@ -441,17 +733,31 @@
       ]
     },
     "lm_trainer/tests/test_task_d_ui.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "34a99fb8a35b001f73c08b59b309d96b9b1e8303642f04ada352c4b183044e8b",
-        436
+        420
       ],
       "target": [
         "34a99fb8a35b001f73c08b59b309d96b9b1e8303642f04ada352c4b183044e8b",
+        436
+      ]
+    },
+    "lm_trainer/tests/test_trainer_phase2_b.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "0055c583b4e0acb348d0cb2af840d721bf16b339f10ce40dad90a6a64ea7368f",
+        436
+      ],
+      "target": [
+        "0055c583b4e0acb348d0cb2af840d721bf16b339f10ce40dad90a6a64ea7368f",
         436
       ]
     },
     "lm_trainer/train/__init__.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "9ce48d6e7b706512ca2ac0bfd6913e6a7ae8cb37d3cacc14ca512922af470bf3",
@@ -459,21 +765,23 @@
       ],
       "target": [
         "9ce48d6e7b706512ca2ac0bfd6913e6a7ae8cb37d3cacc14ca512922af470bf3",
-        420
+        436
       ]
     },
     "lm_trainer/train/artifacts.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "fc366dac391ac8f243630e909f4ae5cf92c45ecf8343a398053107f63651aeba",
-        436
+        "3916bfeceb105f79efce5422e4af8da5e3757b3b5c59ec3e00758a35ea0b239e",
+        420
       ],
       "target": [
-        "fc366dac391ac8f243630e909f4ae5cf92c45ecf8343a398053107f63651aeba",
-        436
+        "3916bfeceb105f79efce5422e4af8da5e3757b3b5c59ec3e00758a35ea0b239e",
+        420
       ]
     },
     "lm_trainer/train/bootstrap.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "4bf8191910ef9f635f436345f7d735d16c7ee6f112d4a7fb93337103f40762d4",
@@ -481,65 +789,71 @@
       ],
       "target": [
         "4bf8191910ef9f635f436345f7d735d16c7ee6f112d4a7fb93337103f40762d4",
-        420
+        436
       ]
     },
     "lm_trainer/train/checkpoints.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "28b12285b921ebdb9f14dc5abc007398da22476a94aee4f04459efa33db3364e",
-        436
-      ],
-      "target": [
-        "28b12285b921ebdb9f14dc5abc007398da22476a94aee4f04459efa33db3364e",
-        436
-      ]
-    },
-    "lm_trainer/train/data.py": {
-      "policy": "copy",
-      "source": [
-        "68083bbcae885eb53f7908371dbb50f5fc765540d175b50a0eb6aa11bffd5a56",
+        "f62f259afd802aa3bde79f3beafc4964db96c704222eadac544394ceb47965b3",
         420
       ],
       "target": [
-        "68083bbcae885eb53f7908371dbb50f5fc765540d175b50a0eb6aa11bffd5a56",
+        "f62f259afd802aa3bde79f3beafc4964db96c704222eadac544394ceb47965b3",
+        420
+      ]
+    },
+    "lm_trainer/train/data.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "bbd81093f8ed450ed788d2ee2c37114781f6d4068720590521215fa053b16d34",
+        420
+      ],
+      "target": [
+        "bbd81093f8ed450ed788d2ee2c37114781f6d4068720590521215fa053b16d34",
         420
       ]
     },
     "lm_trainer/train/dev.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "f12cad5a6912271e86b9df56412e4e9d678a03e73d0a8ca9cb406acd753a5119",
-        436
-      ],
-      "target": [
-        "f12cad5a6912271e86b9df56412e4e9d678a03e73d0a8ca9cb406acd753a5119",
-        436
-      ]
-    },
-    "lm_trainer/train/encoding.py": {
-      "policy": "copy",
-      "source": [
-        "317863b406fd0605d1aa7de276d77e177ba0a7e07287ee182d662ff43316eb9c",
-        436
-      ],
-      "target": [
-        "317863b406fd0605d1aa7de276d77e177ba0a7e07287ee182d662ff43316eb9c",
-        436
-      ]
-    },
-    "lm_trainer/train/engine.py": {
-      "policy": "copy",
-      "source": [
-        "5a0bf560deb380792c58f5c3ba13542e5777f9f7c57cbe452c2913793de245a7",
+        "f935f03ba31933a05978aa68282d40462d05dff05ab847e5bcaa5279ddfc5e23",
         420
       ],
       "target": [
-        "5a0bf560deb380792c58f5c3ba13542e5777f9f7c57cbe452c2913793de245a7",
+        "f935f03ba31933a05978aa68282d40462d05dff05ab847e5bcaa5279ddfc5e23",
+        420
+      ]
+    },
+    "lm_trainer/train/encoding.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "35e949d00f5eed700620b92ac050d896aa5930f84e2d98c2c1dc1b5702a9df40",
+        420
+      ],
+      "target": [
+        "35e949d00f5eed700620b92ac050d896aa5930f84e2d98c2c1dc1b5702a9df40",
+        420
+      ]
+    },
+    "lm_trainer/train/engine.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "72c2cd4d348112842e08ba6179d814828712ed90fa3e75f4ba7c9a91779dbe75",
+        420
+      ],
+      "target": [
+        "72c2cd4d348112842e08ba6179d814828712ed90fa3e75f4ba7c9a91779dbe75",
         420
       ]
     },
     "lm_trainer/train/io.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "cbb0327f32c64eb61c09bfe639554c13977b51b45e8e21f6b8103fe7840386c1",
@@ -547,10 +861,11 @@
       ],
       "target": [
         "cbb0327f32c64eb61c09bfe639554c13977b51b45e8e21f6b8103fe7840386c1",
-        420
+        436
       ]
     },
     "lm_trainer/train/metrics.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "933032a6d8d475addee37eeb1c5d5f52b91d1661d2195b4a5e9dd68f9ef4c565",
@@ -558,32 +873,35 @@
       ],
       "target": [
         "933032a6d8d475addee37eeb1c5d5f52b91d1661d2195b4a5e9dd68f9ef4c565",
-        420
+        436
       ]
     },
     "lm_trainer/train/modeling.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "1830cd561d3fc5adf0f9200b58b8d6168d329dba5d8ef3bcaf4ebfe595e39a27",
+        "fcdcf033e57e9de32fd0591c0657d09b0d328134f8969102bff6dd649ef998c5",
         420
       ],
       "target": [
-        "1830cd561d3fc5adf0f9200b58b8d6168d329dba5d8ef3bcaf4ebfe595e39a27",
+        "fcdcf033e57e9de32fd0591c0657d09b0d328134f8969102bff6dd649ef998c5",
         420
       ]
     },
     "lm_trainer/train/performance.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "b86c46decf124334d80ee0f6022b9cb65a3d6d5c4c3ae39e86745469fc255d3f",
+        "7cea1fdb1108a040b9923593e80f7306f2c634971635a3708c0bf9b12206e10e",
         420
       ],
       "target": [
-        "b86c46decf124334d80ee0f6022b9cb65a3d6d5c4c3ae39e86745469fc255d3f",
+        "7cea1fdb1108a040b9923593e80f7306f2c634971635a3708c0bf9b12206e10e",
         420
       ]
     },
     "lm_trainer/train/reproducibility.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "75677854086bbc65869462860463468cfe5f4168a9cb4156052cdc8434c70dd7",
@@ -591,21 +909,23 @@
       ],
       "target": [
         "75677854086bbc65869462860463468cfe5f4168a9cb4156052cdc8434c70dd7",
-        420
+        436
       ]
     },
     "lm_trainer/train/sampling.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "f9ee93b65b1577a82462980bd413947e66b105cffa6e05a8b5e0853c35995e2f",
-        436
+        "a92364eeca7cc7ee89c660885cdab6fcd09973f17cfdef053e29e3b38abe0dbb",
+        420
       ],
       "target": [
-        "f9ee93b65b1577a82462980bd413947e66b105cffa6e05a8b5e0853c35995e2f",
-        436
+        "a92364eeca7cc7ee89c660885cdab6fcd09973f17cfdef053e29e3b38abe0dbb",
+        420
       ]
     },
     "lm_trainer/train/schedule.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "0770d3c72de3a760f1605cf2bbe8a827167b9be22b5129ddd32657b768cfc2c4",
@@ -613,36 +933,51 @@
       ],
       "target": [
         "0770d3c72de3a760f1605cf2bbe8a827167b9be22b5129ddd32657b768cfc2c4",
-        420
+        436
       ]
     },
     "lm_trainer/train/schema.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "8e90f08e416c5287f60be08d2964ebe208ccedcf4af38b4d3456b32b0c06afd4",
-        436
+        "7930ac502725693f95a5aad29e2311b95674cffdfd5a4048243f721d24435d3b",
+        420
       ],
       "target": [
-        "8e90f08e416c5287f60be08d2964ebe208ccedcf4af38b4d3456b32b0c06afd4",
-        436
+        "7930ac502725693f95a5aad29e2311b95674cffdfd5a4048243f721d24435d3b",
+        420
       ]
     },
     "lm_trainer/train/stages.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
-        "cff5126317ba5ed7f965ad54b6e673e9e93bd9b3e7c06ea4ed20c16383e9f4c6",
+        "bbbdb2751fc14e8aac62ce20b387a6bdbf9ac063f05abdb54fd34305d515169d",
+        420
+      ],
+      "target": [
+        "bbbdb2751fc14e8aac62ce20b387a6bdbf9ac063f05abdb54fd34305d515169d",
+        420
+      ]
+    },
+    "lm_trainer/train/token_audit.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+      "policy": "copy",
+      "source": [
+        "17d8ec01e9d5f6c74a6b5a0c9604eec3595352779c25b6437dfaa52745bf09ff",
         436
       ],
       "target": [
-        "cff5126317ba5ed7f965ad54b6e673e9e93bd9b3e7c06ea4ed20c16383e9f4c6",
+        "17d8ec01e9d5f6c74a6b5a0c9604eec3595352779c25b6437dfaa52745bf09ff",
         436
       ]
     },
     "lm_trainer/webui/__init__.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "c12414dd8e6b41cf327f888806ba7ec197bb51d8c5685d7e9efd8e8f17d24245",
-        436
+        420
       ],
       "target": [
         "c12414dd8e6b41cf327f888806ba7ec197bb51d8c5685d7e9efd8e8f17d24245",
@@ -650,10 +985,11 @@
       ]
     },
     "lm_trainer/webui/__main__.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "c58bee448f76f8ea45a292cec6324fd0e1e78f02eaa2c69288ddfe4d06b61f46",
-        436
+        420
       ],
       "target": [
         "c58bee448f76f8ea45a292cec6324fd0e1e78f02eaa2c69288ddfe4d06b61f46",
@@ -661,10 +997,11 @@
       ]
     },
     "lm_trainer/webui/app.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "13bd509810f8a36fa8169a467528a294b5e78bac25080a0554f24d9c27331858",
-        436
+        420
       ],
       "target": [
         "13bd509810f8a36fa8169a467528a294b5e78bac25080a0554f24d9c27331858",
@@ -672,10 +1009,11 @@
       ]
     },
     "lm_trainer/webui/markdown_safe.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "e4037beab50e6119b51ed6dd28ce853cd764512eeed7f4a9b18d802adb7bed8d",
-        436
+        420
       ],
       "target": [
         "e4037beab50e6119b51ed6dd28ce853cd764512eeed7f4a9b18d802adb7bed8d",
@@ -683,10 +1021,11 @@
       ]
     },
     "lm_trainer/webui/state.py": {
+      "accepted_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
       "policy": "copy",
       "source": [
         "3bb31a048e0d38a613b7b403061c8e4ec1c78283c63bc719f0691b9f85a63d93",
-        436
+        420
       ],
       "target": [
         "3bb31a048e0d38a613b7b403061c8e4ec1c78283c63bc719f0691b9f85a63d93",
@@ -696,19 +1035,10 @@
   },
   "initial_validation": "Receiver baseline: legacy CPU tests, independent source CPU smoke and synthetic product regression. Matching source bytes require explicit review before enrollment.",
   "last_sync": {
-    "added": 38,
-    "file_count": 63,
-    "mode": "allowlisted_copy",
-    "source_branch": "main",
-    "source_commit": "f83fbacf60c2710b7829c664b6fa0933b97a0cad",
-    "test_fixtures": "examples/vision_support",
-    "unchanged": 14,
-    "updated": 11,
-    "verification": {
-      "boa_core_boundary_trainer_tests": "29 passed, 0 failed",
-      "lm_trainer_cpu_tests": "131 passed, 6 skipped, 0 failed",
-      "pre_existing_develop_issue": "tests/test_unsloth_integration.py (12 failed on base develop 94fedc8 due to required --asset-root)"
-    }
+    "date": "2026-11-27",
+    "source_head": "edf7ce8daff8dd8330346abdd0f182ecf5475878",
+    "source_snapshot": "1aba8ea0cedd28424b5c8b01fd3853df70e21012cd00427103057ee4cbf9817a",
+    "summary": "Round 2 shared core import (Tasks A-D): 24 modified + 23 new runtime/contract/test files (86 total)."
   },
   "schema": 1,
   "upstream_observation": {

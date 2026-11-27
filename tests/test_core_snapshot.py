@@ -493,3 +493,48 @@ def test_product_asset_example_in_clean_export(tmp_path):
     external = run("--external-base-model", str(model))
     assert external.returncode == 0, external.stderr
     assert Path(json.loads(external.stdout)["model_name_or_path"]) == model
+
+
+def test_allow_new_file_addition_and_conflict_guards(group):
+    s, t = group
+    third = "lm_trainer/third.py"
+    extended = (*NAMES, third)
+    put(s, third, b"EXTRA = 42\n")
+
+    # Without allow_new, ledger/allowlist mismatch raises ValueError
+    with pytest.raises(ValueError):
+        sync.preview(s, t, {third: current(s, third)[0]}, names=extended)
+
+    # With allow_new=True but without approval -> blocked
+    p_unapproved = sync.preview(s, t, {}, names=extended, allow_new=True)[0]
+    assert p_unapproved["blocked"]
+    assert p_unapproved["files"][third]["action"] == "review: new source bytes unapproved"
+
+    # With allow_new=True and approval -> action == "add", atomic candidate commit succeeds
+    allow = {third: current(s, third)[0]}
+    p_ok = sync.preview(s, t, allow, names=extended, allow_new=True)[0]
+    assert not p_ok["blocked"]
+    assert p_ok["files"][third]["action"] == "add"
+    branch = sync.candidate(
+        s, t, lambda: allow, p_ok["fingerprint"], names=extended, test=check, allow_new=True
+    )
+    assert set(sync.git(t, "diff", "--name-only", "HEAD", branch).splitlines()) == {
+        third,
+        sync.LEDGER,
+    }
+
+    # Conflict when target already exists for a new file not in ledger
+    put(t, third, b"LOCAL = 1\n")
+    p_conflict = sync.preview(s, t, allow, names=extended, allow_new=True)[0]
+    assert p_conflict["blocked"]
+    assert p_conflict["files"][third]["action"] == "conflict: target already exists for new file"
+
+
+def test_repo_core_ledger_matches_allowlist():
+    ledger = json.loads((sync.ROOT / sync.LEDGER).read_text(encoding="utf-8"))
+    assert len(sync.CORE) == 86
+    assert set(ledger["files"]) == set(sync.CORE)
+    for rel in sync.CORE:
+        item = sync.regular(sync.ROOT, rel)
+        sync.check_content(rel, item)
+        assert ledger["files"][rel]["target"][0] == sync.digest(item.data)

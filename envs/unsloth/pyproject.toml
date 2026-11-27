@@ -1,0 +1,45 @@
+[project]
+name = "locall-train-unsloth"
+version = "0.1.0"
+description = "Isolated Unsloth backend for locall-train"
+requires-python = ">=3.13.15,<3.14"
+dependencies = [
+    "unsloth==2026.9.12",
+    "unsloth-zoo==2026.9.8",
+    "torch==2.12.1+cu130",
+    "torchvision==0.27.1+cu130",
+    # 官方 cu130 索引缺少 xformers 0.0.35；清华 PyPI 的 abi3 wheel 可复用于 CPython 3.13。
+    "xformers==0.0.35",
+    "transformers==5.5.0",
+    "datasets==4.3.0",
+    "accelerate==1.15.0",
+    "peft==0.21.1",
+    "bitsandbytes==0.50.2",
+]
+
+[dependency-groups]
+dev = ["pytest==9.1.1"]
+
+[tool.uv]
+package = false
+# Unsloth 环境只服务本机 Linux x86_64 + RTX 3090，避免跨平台 CUDA 锁解析失败。
+environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
+concurrent-downloads = 2
+concurrent-installs = 2
+
+[[tool.uv.index]]
+name = "tuna"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu130" }
+torchvision = { index = "pytorch-cu130" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

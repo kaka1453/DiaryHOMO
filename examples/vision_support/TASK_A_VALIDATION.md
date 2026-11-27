@@ -71,7 +71,7 @@ uv run --no-sync python -B -m lm_trainer \
   --model-config examples/industrial_support/model.yaml --validate-release
 
 # 只打开本地真实 tokenizer 文件，不打开权重。替换为你的本地目录。
-P=/home/jutze/ZY_backup/llm/models/Qwen3.8-27B-Quark-AWQ-INT4-W4A16
+P=/path/to/models/Qwen3.8-27B-Quark-AWQ-INT4-W4A16
 mkdir -p .cache
 out=$(mktemp -d "$PWD/.cache/task-a-evidence.XXXXXX")
 for stage in cpt sft; do

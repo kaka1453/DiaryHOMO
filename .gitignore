@@ -41,3 +41,12 @@ config/diary_profile.yaml
 !/product_assets/example/checkpoints/.gitkeep
 /product_assets/example/runs/*
 !/product_assets/example/runs/.gitkeep
+
+# Round 2 isolated caches and venvs
+*.log
+.cache/
+.pytest_cache/
+.ruff_cache/
+envs/**/.venv/
+envs/**/unsloth_compiled_cache/
+envs/**/.pytest_cache/

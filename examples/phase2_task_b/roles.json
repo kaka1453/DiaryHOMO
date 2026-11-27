@@ -1,0 +1,9 @@
+{
+  "schema": "lm_trainer.chat-roles.v1",
+  "roles": [{
+    "role_id": "CS_AGENT",
+    "namespace": "fixture-line-iris",
+    "version": "1",
+    "system_prompt": "你是虚构设备客服。区分已知和待确认事实。"
+  }]
+}

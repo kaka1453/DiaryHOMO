@@ -1,0 +1,39 @@
+model_name_or_path: base
+data_mode: fixture
+backend: hf
+compute_dtype: fp32
+quantization_mode: none
+max_length: 1024
+batch_size: 1
+gradient_accumulation_steps: 3
+max_steps: 4
+save_steps: 1
+packing: false
+template_policy:
+  stop_tokens: ['<|im_end|>']
+  system_prompt: '你是虚构设备客服。区分已知和待确认事实。'
+stages:
+  - name: mixed_cpt
+    manifest_path: cpt/manifest.json
+    objective: causal_text
+    init_adapter: new
+    output_dir: runs/mixed_cpt
+    sources: [support_history, shift_notes]
+    target_loss_token_share: {support_history: 0.6, shift_notes: 0.4}
+    max_sample_repeats: 1
+    max_effective_epochs: 1
+    lr: 0.003
+    max_steps: 4
+    seed: 71
+  - name: dialogue_sft
+    manifest_path: joint/manifest.json
+    objective: assistant_only_messages
+    corpus_schema_allowlist: [conversation.stage3.structured.v3]
+    init_adapter: continue_stage
+    parent: stage:mixed_cpt
+    output_dir: runs/mixed_sft
+    supervise_target_eos: true
+    target_loss_token_share: natural
+    lr: 0.002
+    max_steps: 4
+    seed: 72

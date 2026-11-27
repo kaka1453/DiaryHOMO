@@ -18,18 +18,23 @@ LEDGER = "handoff/core-ledger.json"
 CORE = tuple(
     "lm_trainer/" + name
     for name in (
+        "CONVERSATION_RENDERER_CONTRACT.md",
+        "INFERENCE_SERVICE_CONTRACT.md",
         "LICENSE",
+        "MEMORY_RAG_CONTRACT.md",
         "README.md",
         "TASK_A_CONTRACT.md",
         "TASK_B_CONTRACT.md",
         "TASK_C_CONTRACT.md",
         "THIRD_PARTY_LICENSE.txt",
+        "TRAINER_OPTIMIZATION_CONTRACT.md",
         "__init__.py",
         "__main__.py",
         "chat/__init__.py",
         "chat/__main__.py",
         "chat/backend.py",
         "chat/context.py",
+        "chat/inference.py",
         "chat/memory.py",
         "chat/registry.py",
         "chat/runtime.py",
@@ -38,27 +43,44 @@ CORE = tuple(
         "config/common.py",
         "config/stages.py",
         "config/train_config.py",
+        "conversation/__init__.py",
+        "conversation/contract.py",
+        "conversation/renderer.py",
         "eval/__init__.py",
         "eval/__main__.py",
         "eval/blind.py",
         "eval/cards.py",
+        "eval/memory_rag.py",
         "eval/provider.py",
         "eval/report.py",
         "eval/runner.py",
         "eval/schema.py",
         "generation.py",
+        "memory/__init__.py",
+        "memory/__main__.py",
+        "memory/import-v1.schema.json",
+        "memory/provider.py",
+        "memory/schema.py",
+        "memory/store.py",
         "model/__init__.py",
         "model/loader.py",
         "model/quantization.py",
         "requirements.txt",
+        "serve/__init__.py",
+        "serve/__main__.py",
+        "serve/app.py",
         "template_policy.py",
         "tests/test_contract.py",
+        "tests/test_conversation_renderer.py",
         "tests/test_hf.py",
+        "tests/test_inference_service.py",
+        "tests/test_memory_rag.py",
         "tests/test_task_a.py",
         "tests/test_task_b.py",
         "tests/test_task_c.py",
         "tests/test_task_d.py",
         "tests/test_task_d_ui.py",
+        "tests/test_trainer_phase2_b.py",
         "train/__init__.py",
         "train/artifacts.py",
         "train/bootstrap.py",
@@ -76,12 +98,46 @@ CORE = tuple(
         "train/schedule.py",
         "train/schema.py",
         "train/stages.py",
+        "train/token_audit.py",
         "webui/__init__.py",
         "webui/__main__.py",
         "webui/app.py",
         "webui/markdown_safe.py",
         "webui/state.py",
     )
+)
+CORE_RUNTIME = CORE
+TEST_SUPPORT = (
+    "examples/1/Intelligent_Support_Groupchat_Data_Test.md",
+    "examples/1/rag参考文件/Intelligent_Support_RAG_Data_Contract_and_Test.md",
+    "examples/conversation_renderer/fixture.py",
+    "examples/conversation_renderer/fixture_train.yaml",
+    "examples/conversation_renderer/synthetic_token_trace.json",
+    "examples/conversation_renderer/trace.py",
+    "examples/memory_rag/README.md",
+    "examples/memory_rag/fixture.py",
+    "examples/phase2_task_b/README.md",
+    "examples/phase2_task_b/direct_sft.yaml",
+    "examples/phase2_task_b/eval_fixture.py",
+    "examples/phase2_task_b/mixed_cpt_sft.yaml",
+    "examples/phase2_task_b/model.yaml",
+    "examples/phase2_task_b/model_registry.py",
+    "examples/phase2_task_b/prepare.py",
+    "examples/phase2_task_b/roles.json",
+    "examples/vision_support/TASK_A_VALIDATION.md",
+)
+BINARY_FIXTURES = (
+    "examples/1/rag参考文件/Intelligent_Support_RAG_Fixtures.zip",
+)
+ENV_LOCKS = (
+    ".python-version",
+    "pyproject.toml",
+    "uv.lock",
+    "envs/unsloth/.python-version",
+    "envs/unsloth/pyproject.toml",
+    "envs/unsloth/tests/test_task_a_loss.py",
+    "envs/unsloth/tests/test_unsloth_smoke.py",
+    "envs/unsloth/uv.lock",
 )
 EXAMPLE = tuple(
     "examples/industrial_support/" + name
@@ -261,12 +317,15 @@ def classify(old, source, target, approved):
     return "copy"
 
 
-def preview(source, target, approval, *, names=CORE, establish=False):
+def preview(source, target, approval, *, names=CORE, establish=False, allow_new=False):
     ledger_bytes = regular(target, LEDGER).data
     ledger = json.loads(ledger_bytes)
     if not isinstance(approval, dict):
         raise ValueError("approval must be an object mapping paths to SHA-256")
-    if set(ledger["files"]) != set(names) or set(approval) - set(names):
+    if allow_new:
+        if not set(ledger["files"]).issubset(set(names)) or set(approval) - set(names):
+            raise ValueError("ledger or approval outside the group allowlist")
+    elif set(ledger["files"]) != set(names) or set(approval) - set(names):
         raise ValueError("ledger or approval outside the group allowlist")
     if any(
         not isinstance(v, str) or not re.fullmatch("[0-9a-f]{64}", v)
@@ -284,19 +343,33 @@ def preview(source, target, approval, *, names=CORE, establish=False):
                 item = None
             files.append(item)
         src, dst = [f.signature() if f is not None else None for f in files]
-        action = classify(ledger["files"][name], src, dst, approval.get(name))
-        if (
-            establish
-            and action == "identical"
-            and approval.get(name) == src[0]
-            and (
-                ledger["files"][name]["policy"] != "copy"
-                or ledger["files"][name]["source"] != src
-            )
-        ):
-            action = "enroll matched bytes"
+        if name not in ledger["files"]:
+            if src is None:
+                action = "review: missing or invalid type"
+            elif dst is not None:
+                action = "conflict: target already exists for new file"
+            elif approval.get(name) != src[0]:
+                action = "review: new source bytes unapproved"
+            else:
+                action = "add"
+        else:
+            action = classify(ledger["files"][name], src, dst, approval.get(name))
+            if (
+                establish
+                and action == "identical"
+                and approval.get(name) == src[0]
+                and (
+                    ledger["files"][name]["policy"] != "copy"
+                    or ledger["files"][name]["source"] != src
+                )
+            ):
+                action = "enroll matched bytes"
         rows[name] = {"source": src, "target": dst, "action": action}
-        if files[1] is not None:
+        if action == "add":
+            selected[name] = File(
+                files[0].data, 0o755 if files[0].mode & 0o111 else 0o644
+            )
+        elif files[1] is not None:
             selected[name] = (
                 File(files[0].data, files[1].mode) if action == "copy" else files[1]
             )
@@ -388,6 +461,7 @@ def candidate(
     names=CORE,
     test=run_core_tests,
     establish=False,
+    allow_new=False,
 ):
     target = Path(target).absolute()
     if git(target, "rev-parse", "--show-toplevel") != str(target):
@@ -400,7 +474,12 @@ def candidate(
 
     def verify():
         result = preview(
-            source, target, get_approval(), names=names, establish=establish
+            source,
+            target,
+            get_approval(),
+            names=names,
+            establish=establish,
+            allow_new=allow_new,
         )
         plan = result[0]
         if plan["blocked"] or plan["fingerprint"] != expected:
@@ -414,7 +493,11 @@ def candidate(
         return result
 
     plan, files, ledger = verify()
-    edits = {n: files[n] for n, row in plan["files"].items() if row["action"] == "copy"}
+    edits = {
+        n: files[n]
+        for n, row in plan["files"].items()
+        if row["action"] in ("copy", "add")
+    }
     enrolled = {
         n for n, row in plan["files"].items() if row["action"] == "enroll matched bytes"
     }
@@ -442,7 +525,7 @@ def candidate(
                     and plan["approval"].get(name) == row["source"][0]
                 )
             ):
-                ledger["files"][name].update(
+                ledger["files"].setdefault(name, {}).update(
                     policy="copy",
                     source=row["source"],
                     target=files[name].signature(),
@@ -513,6 +596,11 @@ def main():
             action="store_true",
             help="explicitly enroll approved byte-identical files for future copying",
         )
+        cmd.add_argument(
+            "--allow-new",
+            action="store_true",
+            help="allow adding explicitly approved new files in the allowlist",
+        )
         cmd.add_argument("--source", required=True, type=Path)
         cmd.add_argument("--target", default=ROOT, type=Path)
         cmd.add_argument(
@@ -536,14 +624,25 @@ def main():
         return json.loads(regular(args.approval.parent, args.approval.name).data)
 
     if args.command == "preview":
-        plan = preview(args.source, args.target, approval(), establish=args.establish)[
+        plan = preview(
+            args.source,
+            args.target,
+            approval(),
+            establish=args.establish,
+            allow_new=args.allow_new,
+        )[
             0
         ]
         print(encoded(plan).decode(), end="")
         return 2 if plan["blocked"] else 0
     print(
         candidate(
-            args.source, args.target, approval, args.expect, establish=args.establish
+            args.source,
+            args.target,
+            approval,
+            args.expect,
+            establish=args.establish,
+            allow_new=args.allow_new,
         )
     )
 
