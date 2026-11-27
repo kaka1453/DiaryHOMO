@@ -57,6 +57,14 @@ def build_train_runtime_config(args):
     if args.external_base_model is not None:
         external_base_model(args.external_base_model)
     runtime = core.build_train_runtime_config(args)
+    if "stages" in runtime:
+        stages = []
+        for stage in runtime["stages"]:
+            if args.external_base_model is None:
+                model = Path(stage["model_name_or_path"]).relative_to(root)
+                asset_path(root, str(model), "model_name_or_path", "assets", directory=True)
+            stages.append({**stage, "asset_root": str(root)})
+        return {**runtime, "stages": stages, "asset_root": str(root)}
     if args.external_base_model is None:
         model = Path(runtime["model_name_or_path"]).relative_to(root)
         asset_path(root, str(model), "model_name_or_path", "assets", directory=True)

@@ -117,14 +117,49 @@ def build_quantization_config(runtime):
     )
 
 
+def _is_staged_runtime(runtime):
+    return isinstance(runtime, dict) and (
+        "stages" in runtime or bool(runtime.get("init_adapter"))
+    )
+
+
 def main():
     parser = build_parser()
     args = parser.parse_args()
     runtime = build_or_exit(parser, build_runtime_config, args)
 
+    if _is_staged_runtime(runtime):
+        parser.exit(
+            2,
+            "Legacy train/train.py only supports single-stage legacy runs. "
+            "Use `python -m lm_trainer --asset-root ...` for staged or explicit init_adapter workflows.\n",
+        )
+
     if args.dry_run:
         print("Train 配置检查通过。")
         print(dump_runtime_config(runtime))
+        return
+
+    if getattr(args, "validate_release", False):
+        import json
+        from lm_trainer.template_policy import public_policy
+        from lm_trainer.train.io import validate_paths as _validate_paths
+        from lm_trainer.train.schema import DataContractError, preflight_data
+
+        try:
+            _validate_paths(runtime, require_model=False)
+            plan = preflight_data(runtime).plan
+        except DataContractError as exc:
+            parser.exit(2, f"{exc}\n")
+        except (OSError, ValueError, TypeError) as exc:
+            parser.error(str(exc))
+        print(
+            json.dumps(
+                {**plan, "template_policy": public_policy(plan["template_policy"])},
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
         return
 
     configure_caches(product_root(runtime["asset_root"]))
